@@ -3,8 +3,33 @@ const express          = require('express');
 const router           = express.Router();
 const Groq             = require('groq-sdk');
 const Fuse             = require('fuse.js');
+const multer           = require('multer');
+const { File }         = require('buffer');
 const requirePlanLevel = require('../middleware/requirePlanLevel');
 const db               = require('../config/db');
+
+// Multer para upload de áudio (10 MB, formatos permitidos)
+const uploadAudio = multer({
+    storage: multer.memoryStorage(),
+    limits:  { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        console.log('[transcribe] mimetype:', file.mimetype);
+        const allowed = ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/mpeg', 'audio/x-m4a'];
+        const isAllowed = allowed.some(type => file.mimetype.startsWith(type));
+        isAllowed ? cb(null, true) : cb(new Error('Formato não suportado.'));
+    },
+});
+
+// Rate limiter em memória (por userId + chave)
+const _rateLimitStore = new Map();
+function checkRateLimit(userId, key, max, windowMs) {
+    const mapKey = `${key}:${userId}`;
+    const now    = Date.now();
+    const times  = (_rateLimitStore.get(mapKey) || []).filter(t => now - t < windowMs);
+    times.push(now);
+    _rateLimitStore.set(mapKey, times);
+    return times.length <= max;
+}
 
 // Planos gymbro e black têm acesso à IA
 const requireIA = requirePlanLevel(['gymbro', 'black']);
@@ -44,6 +69,15 @@ async function initPlanTables() {
     `);
 }
 initPlanTables().catch(err => console.error('[ai] initPlanTables:', err.message));
+
+// Adiciona coluna context_summary à ai_session se ainda não existir (errno 1060 = duplicate column)
+(async () => {
+    try {
+        await db.execute('ALTER TABLE ai_session ADD COLUMN context_summary TEXT NULL');
+    } catch (err) {
+        if (err.errno !== 1060) console.error('[ai] alter ai_session:', err.message);
+    }
+})();
 
 // Cache de exercícios do banco — expira em 24h
 let _exerciseCache    = null;
@@ -138,7 +172,7 @@ async function loadImcProfile(userId) {
     };
 }
 
-async function buildSystemPrompt(user, exerciseBlock, existingPlanNames = []) {
+async function buildSystemPrompt(user, exerciseBlock, existingPlanNames = [], contextSummary = null) {
     const imc = user.imc;
     const aval = user.avaliacaoCorporal;
 
@@ -148,6 +182,9 @@ async function buildSystemPrompt(user, exerciseBlock, existingPlanNames = []) {
         prompt += `
 
 Observação: o usuário ${user.nome} ainda não preencheu o formulário de perfil IMC. Se ele pedir orientações personalizadas de treino ou nutrição, informe gentilmente que pode preencher o perfil em /imc-form para receber recomendações mais precisas.`;
+        if (contextSummary) {
+            prompt += `\n\nResumo da conversa anterior:\n${contextSummary}`;
+        }
         prompt += `
 
 IMPORTANTE: Você SEMPRE deve responder com um JSON válido, sem markdown, sem texto fora do JSON.
@@ -216,6 +253,10 @@ Avaliação corporal por IA (realizada em ${aval.data || 'data não registrada'}
     prompt += `
 
 Use este perfil para personalizar todas as respostas. Não precisa repetir os dados do perfil na resposta, apenas use-os para contextualizar as orientações.`;
+
+    if (contextSummary) {
+        prompt += `\n\nResumo da conversa anterior:\n${contextSummary}`;
+    }
 
     prompt += `
 
@@ -426,6 +467,10 @@ router.post('/message', requireIA, async (req, res) => {
 
     const userId = req.session.user.id;
 
+    if (!checkRateLimit(userId, 'message', 20, 60000)) {
+        return res.status(429).json({ reply: 'Muitas requisições. Aguarde um momento.' });
+    }
+
     // Garante IMC na sessão (carrega do DB se não tiver)
     if (!req.session.user.imc) {
         req.session.user.imc = await loadImcProfile(userId).catch(() => null);
@@ -438,7 +483,7 @@ router.post('/message', requireIA, async (req, res) => {
             [userId]
         );
 
-        let sessionId;
+        let sessionId, contextSummary = null;
         if (sessions.length === 0) {
             const [[ctxRows]] = await db.execute('CALL sp_contexto_ia(?)', [userId]);
             const ctx = ctxRows?.[0] || { nome: req.session.user.nome, plano: req.session.user.plano };
@@ -449,6 +494,7 @@ router.post('/message', requireIA, async (req, res) => {
             sessionId = r.insertId;
         } else {
             sessionId = sessions[0].id;
+            contextSummary = sessions[0].context_summary || null;
         }
 
         // Carrega histórico da sessão (últimas 20 mensagens)
@@ -482,7 +528,7 @@ router.post('/message', requireIA, async (req, res) => {
             model:      'llama-3.3-70b-versatile',
             max_tokens: 4000,
             messages: [
-                { role: 'system', content: await buildSystemPrompt(req.session.user, exerciseBlock, existingPlanNames) },
+                { role: 'system', content: await buildSystemPrompt(req.session.user, exerciseBlock, existingPlanNames, contextSummary) },
                 ...historico.map(m => ({
                     role: m.role,
                     content: typeof m.content === 'string' && m.content.startsWith('{')
@@ -512,6 +558,43 @@ router.post('/message', requireIA, async (req, res) => {
             'UPDATE ai_session SET total_mensagens=total_mensagens+2, total_tokens=total_tokens+? WHERE id=?',
             [tokens, sessionId]
         );
+
+        // Async summary: gera a cada 10 mensagens (5 trocas) para injetar no próximo contexto
+        const prevTotal = sessions[0]?.total_mensagens || 0;
+        const newTotal  = prevTotal + 2;
+        if (newTotal >= 10 && newTotal % 10 === 0) {
+            (async () => {
+                try {
+                    const [msgs] = await db.execute(
+                        'SELECT role, content FROM ai_message WHERE session_id=? ORDER BY created_at ASC LIMIT 30',
+                        [sessionId]
+                    );
+                    const transcript = msgs.map(m => {
+                        const role = m.role === 'user' ? 'Usuário' : 'GymBot';
+                        let content = m.content;
+                        try {
+                            if (typeof content === 'string' && content.startsWith('{')) {
+                                content = JSON.parse(content).message || content;
+                            }
+                        } catch {}
+                        return `${role}: ${content}`;
+                    }).join('\n');
+                    const groqSum = new Groq({ apiKey: process.env.GROQ_API_KEY });
+                    const sumRes = await groqSum.chat.completions.create({
+                        model: 'llama-3.1-8b-instant',
+                        max_tokens: 300,
+                        messages: [
+                            { role: 'system', content: 'Resuma a conversa abaixo em até 150 palavras, focando em: objetivos do usuário, planos discutidos ou gerados, preferências e restrições mencionadas. Seja conciso e objetivo.' },
+                            { role: 'user', content: transcript }
+                        ]
+                    });
+                    const summary = sumRes.choices[0].message.content;
+                    await db.execute('UPDATE ai_session SET context_summary=? WHERE id=?', [summary, sessionId]);
+                } catch (err) {
+                    console.error('[ai] async summary:', err.message);
+                }
+            })();
+        }
 
         return res.json({ reply });
     } catch (err) {
@@ -587,6 +670,120 @@ router.post('/plan/save', requireIA, async (req, res) => {
         console.error('[ai/plan/save]', err.message);
         return res.status(500).json({ erro: 'Erro ao salvar plano.' });
     }
+});
+
+// GET /ai/conversations — lista todas as sessões do usuário
+router.get('/conversations', requireIA, async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ error: 'Não autorizado.' });
+    const userId = req.session.user.id;
+    try {
+        const [rows] = await db.execute(
+            'SELECT id, ativa, context_summary, total_mensagens, created_at FROM ai_session WHERE user_id=? ORDER BY created_at DESC LIMIT 20',
+            [userId]
+        );
+        return res.json({ conversations: rows });
+    } catch (err) {
+        console.error('[ai/conversations]', err.message);
+        return res.status(500).json({ error: 'Erro ao listar conversas.' });
+    }
+});
+
+// GET /ai/conversations/:id/messages — mensagens de uma sessão específica
+router.get('/conversations/:id/messages', requireIA, async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ error: 'Não autorizado.' });
+    const userId    = req.session.user.id;
+    const sessionId = parseInt(req.params.id);
+    try {
+        const [sessions] = await db.execute(
+            'SELECT id FROM ai_session WHERE id=? AND user_id=?',
+            [sessionId, userId]
+        );
+        if (!sessions.length) return res.status(404).json({ error: 'Conversa não encontrada.' });
+        const [messages] = await db.execute(
+            'SELECT role, content, created_at FROM ai_message WHERE session_id=? ORDER BY created_at ASC',
+            [sessionId]
+        );
+        return res.json({ messages });
+    } catch (err) {
+        console.error('[ai/conversations/:id/messages]', err.message);
+        return res.status(500).json({ error: 'Erro ao carregar mensagens.' });
+    }
+});
+
+// POST /ai/conversations/new — cria nova sessão e desativa a atual
+router.post('/conversations/new', requireIA, async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ error: 'Não autorizado.' });
+    const userId = req.session.user.id;
+    try {
+        await db.execute('UPDATE ai_session SET ativa=0 WHERE user_id=?', [userId]);
+        let ctx = { nome: req.session.user.nome, plano: req.session.user.plano };
+        try {
+            const [[ctxSet]] = await db.execute('CALL sp_contexto_ia(?)', [userId]);
+            ctx = ctxSet?.[0] || ctx;
+        } catch {}
+        const [r] = await db.execute(
+            'INSERT INTO ai_session (user_id, modelo, context_snapshot) VALUES (?, ?, ?)',
+            [userId, 'llama-3.3-70b-versatile', JSON.stringify(ctx)]
+        );
+        return res.json({ ok: true, sessionId: r.insertId });
+    } catch (err) {
+        console.error('[ai/conversations/new]', err.message);
+        return res.status(500).json({ error: 'Erro ao criar conversa.' });
+    }
+});
+
+// POST /ai/conversations/:id/activate — ativa uma sessão específica
+router.post('/conversations/:id/activate', requireIA, async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ error: 'Não autorizado.' });
+    const userId    = req.session.user.id;
+    const sessionId = parseInt(req.params.id);
+    try {
+        const [sessions] = await db.execute(
+            'SELECT id FROM ai_session WHERE id=? AND user_id=?',
+            [sessionId, userId]
+        );
+        if (!sessions.length) return res.status(404).json({ error: 'Conversa não encontrada.' });
+        await db.execute('UPDATE ai_session SET ativa=0 WHERE user_id=?', [userId]);
+        await db.execute('UPDATE ai_session SET ativa=1 WHERE id=?', [sessionId]);
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('[ai/conversations/:id/activate]', err.message);
+        return res.status(500).json({ error: 'Erro ao ativar conversa.' });
+    }
+});
+
+// POST /ai/transcribe — transcreve áudio com Groq Whisper
+router.post('/transcribe', requireIA, (req, res) => {
+    if (!req.session.user) return res.status(401).json({ ok: false, error: 'Não autorizado.' });
+
+    uploadAudio.single('audio')(req, res, async (err) => {
+        if (err) return res.status(400).json({ ok: false, error: err.message });
+        if (!req.file) return res.status(400).json({ ok: false, error: 'Nenhum áudio enviado.' });
+
+        const userId = req.session.user.id;
+        if (!checkRateLimit(userId, 'transcribe', 10, 60000)) {
+            return res.status(429).json({ ok: false, error: 'Muitas requisições. Aguarde um momento.' });
+        }
+
+        try {
+            const audioFile = new File(
+                [req.file.buffer],
+                req.file.originalname || 'audio.webm',
+                { type: req.file.mimetype }
+            );
+            const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+            const transcricao = await groq.audio.transcriptions.create({
+                file:            audioFile,
+                model:           'whisper-large-v3-turbo',
+                language:        'pt',
+                response_format: 'json',
+            });
+            return res.json({ ok: true, texto: transcricao.text });
+        } catch (err) {
+            console.error('[ai/transcribe]', err.message);
+            return res.status(500).json({ ok: false, error: 'Erro ao transcrever.' });
+        }
+    });
 });
 
 module.exports = router;
