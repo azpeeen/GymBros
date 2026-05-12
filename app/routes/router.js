@@ -24,6 +24,24 @@ function safeJson(str, fallback) {
     catch { return fallback; }
 }
 
+// Cria tabela de check-ins manuais de treino (separada da checkin de academia)
+(async () => {
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS treino_checkins (
+                id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id    INT UNSIGNED NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                INDEX idx_treino_checkin_user_data (user_id, created_at),
+                CONSTRAINT fk_treino_checkin_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB
+        `);
+    } catch (err) {
+        console.error('[router] initTreinoCheckins:', err.message);
+    }
+})();
+
 // ── Multer: upload de foto de perfil ──────────────────────────────────────────
 const photoStorage = new CloudinaryStorage({
     cloudinary,
@@ -480,6 +498,104 @@ router.get('/treinos', requirePlano, async (req, res) => {
         sugestoes: SUGESTOES_TREINO,
         seo: { title: 'Meus Treinos — GymBros', canonical: '/treinos', robots: 'noindex, nofollow', description: 'Gerencie seus treinos no GymBros.' },
     });
+});
+
+// POST /treinos/checkin — registra presença manual (máx 1 por dia)
+router.post('/treinos/checkin', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    try {
+        const [existing] = await db.execute(
+            `SELECT id FROM treino_checkins WHERE user_id = ? AND DATE(created_at) = CURDATE() LIMIT 1`,
+            [userId]
+        );
+        if (existing.length > 0) {
+            return res.status(409).json({ ok: false, erro: 'Você já registrou presença hoje.' });
+        }
+        const [result] = await db.execute(
+            'INSERT INTO treino_checkins (user_id) VALUES (?)',
+            [userId]
+        );
+        const [rows] = await db.execute(
+            'SELECT created_at FROM treino_checkins WHERE id = ?',
+            [result.insertId]
+        );
+        return res.json({ ok: true, created_at: rows[0].created_at });
+    } catch (err) {
+        console.error('[checkin]', err.message);
+        return res.status(500).json({ ok: false, erro: 'Erro ao registrar check-in.' });
+    }
+});
+
+// GET /treinos/checkin/status — retorna status do check-in do dia + streak
+router.get('/treinos/checkin/status', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    try {
+        const [todayRows] = await db.execute(
+            `SELECT created_at FROM treino_checkins WHERE user_id = ? AND DATE(created_at) = CURDATE() LIMIT 1`,
+            [userId]
+        );
+        const checkedInToday = todayRows.length > 0;
+        const todayCheckin   = checkedInToday ? todayRows[0].created_at : null;
+
+        const [lastRows] = await db.execute(
+            `SELECT created_at FROM treino_checkins WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
+            [userId]
+        );
+        const lastCheckin = lastRows.length > 0 ? lastRows[0].created_at : null;
+
+        let diasSemCheckin = 0;
+        if (lastCheckin) {
+            diasSemCheckin = Math.floor((Date.now() - new Date(lastCheckin)) / 86400000);
+        }
+
+        // Streak: dias consecutivos com check-in
+        const [dateRows] = await db.execute(
+            `SELECT DATE(created_at) AS data
+             FROM treino_checkins WHERE user_id = ?
+             GROUP BY DATE(created_at) ORDER BY data DESC`,
+            [userId]
+        );
+        let streak = 0;
+        if (dateRows.length > 0) {
+            const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+            const toDate   = s => (s instanceof Date ? s.toISOString().slice(0, 10) : String(s).slice(0, 10));
+            const dateSet  = new Set(dateRows.map(r => toDate(r.data)));
+            let cursor     = new Date(todayStr + 'T12:00:00Z');
+            if (!checkedInToday) cursor = new Date(cursor.getTime() - 86400000);
+            while (dateSet.has(cursor.toISOString().slice(0, 10))) {
+                streak++;
+                cursor = new Date(cursor.getTime() - 86400000);
+            }
+        }
+
+        return res.json({ checkedInToday, lastCheckin: todayCheckin, diasSemCheckin, streak });
+    } catch (err) {
+        console.error('[checkin/status]', err.message);
+        return res.status(500).json({ erro: 'Erro ao buscar status.' });
+    }
+});
+
+// POST /internal/checkin-alerts — lista usuários com 3+ dias sem check-in (Web Push vem na F10)
+router.post('/internal/checkin-alerts', async (req, res) => {
+    if (req.headers['x-internal-key'] !== process.env.INTERNAL_KEY) {
+        return res.status(401).json({ erro: 'Não autorizado.' });
+    }
+    try {
+        const [users] = await db.execute(`
+            SELECT u.id, u.nome, u.email,
+                   MAX(tc.created_at)                        AS ultimo_checkin,
+                   DATEDIFF(NOW(), MAX(tc.created_at))       AS dias_sem_checkin
+            FROM user u
+            LEFT JOIN treino_checkins tc ON tc.user_id = u.id
+            WHERE u.status = 'ativo'
+            GROUP BY u.id, u.nome, u.email
+            HAVING dias_sem_checkin >= 3 OR ultimo_checkin IS NULL
+        `);
+        return res.json({ ok: true, usersToNotify: users });
+    } catch (err) {
+        console.error('[checkin-alerts]', err.message);
+        return res.status(500).json({ erro: 'Erro interno.' });
+    }
 });
 
 //Evolução
