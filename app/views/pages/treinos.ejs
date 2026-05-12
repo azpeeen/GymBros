@@ -52,6 +52,71 @@
             <p>Registre suas sessões e acompanhe seu progresso</p>
         </section>
 
+        <!-- PLANO DA IA — PRINCIPAL -->
+        <% if (iaPlanos && iaPlanos.length > 0) { %>
+        <section class="ia-plano-section">
+            <section class="ia-plano-header">
+                <h2><i class="fas fa-robot"></i> Seus Planos de Treino</h2>
+                <a href="/ai/chat" class="btn-pedir-ia btn-pedir-ia--sm"><i class="fas fa-plus"></i> Novo treino</a>
+            </section>
+            <!-- TABS -->
+            <section class="ia-tabs-nav">
+                <% iaPlanos.forEach((plano, idx) => { %>
+                <% const letra = String.fromCharCode(65 + idx); %>
+                <button class="ia-tab-btn <%= idx === 0 ? 'active' : '' %>" data-tab="<%= idx %>">
+                    Treino <%= letra %>
+                </button>
+                <% }) %>
+            </section>
+            <!-- CONTEÚDOS -->
+            <% iaPlanos.forEach((plano, idx) => { %>
+            <% const letra = String.fromCharCode(65 + idx); %>
+            <section class="ia-tab-content <%= idx === 0 ? 'active' : '' %>" data-tab="<%= idx %>">
+                <section class="ia-plano-card">
+                    <h3><%= plano.nome %></h3>
+                    <% if (plano.descricao) { %>
+                    <p class="ia-plano-desc"><%= plano.descricao %></p>
+                    <% } %>
+                    <ul class="ia-exercicios-lista">
+                        <% plano.exercicios_json.forEach(ex => { %>
+                        <li>
+                            <section class="ia-ex-nome"><%= ex.nome_pt %></section>
+                            <section class="ia-ex-detalhe"><%= ex.series %>x<%= ex.repeticoes %> · Descanso: <%= ex.descanso_segundos %>s · <%= ex.carga_sugerida %></section>
+                        </li>
+                        <% }) %>
+                    </ul>
+                    <section class="ia-plano-actions">
+                        <button class="btn-iniciar-treino" disabled><i class="fas fa-play"></i> Iniciar Treino</button>
+                        <a href="/ai/chat" class="btn-pedir-ia"><i class="fas fa-robot"></i> Pedir novo treino à IA</a>
+                    </section>
+                </section>
+            </section>
+            <% }) %>
+        </section>
+        <% } else { %>
+        <section class="ia-plano-vazio">
+            <i class="fas fa-robot"></i>
+            <h3>Nenhum plano de treino gerado ainda</h3>
+            <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
+            <p>Converse com o GymBot para criar seu plano personalizado.</p>
+            <a href="/ai/chat" class="btn-pedir-ia"><i class="fas fa-robot"></i> Gerar treino com IA</a>
+            <% } else { %>
+            <p>Faça upgrade para o plano GymBro ou Black para usar o Personal Trainer IA.</p>
+            <a href="/meu-plano?upgrade=1" class="btn-pedir-ia"><i class="fas fa-lock"></i> Ver planos</a>
+            <% } %>
+        </section>
+        <% } %>
+
+        <!-- REGISTRAR TREINO — COLAPSÁVEL -->
+        <details class="registrar-collapse">
+            <summary><i class="fas fa-plus-circle"></i> Registrar treino de hoje</summary>
+            <section class="registrar-collapse-body">
+                <button class="btn-registrar" id="btnAbrirModal">
+                    <i class="fas fa-plus"></i> Abrir formulário de registro
+                </button>
+            </section>
+        </details>
+
         <!-- STATS RÁPIDOS (preenchidos via JS do localStorage) -->
         <section class="treinos-stats">
             <section class="stat-box">
@@ -84,9 +149,6 @@
                 <button class="filtro-btn" data-filtro="Cardio">🔥 Cardio</button>
                 <button class="filtro-btn" data-filtro="Alongamento">🧘 Alongamento</button>
             </section>
-            <button class="btn-registrar" id="btnAbrirModal">
-                <i class="fas fa-plus"></i> Registrar Treino
-            </button>
         </section>
 
         <!-- MEUS TREINOS (banco de dados) -->
@@ -247,6 +309,16 @@
 <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 <script>window.GYMBROS_USER_ID = '<%= user.cpf %>';</script>
+<script>
+document.querySelectorAll('.ia-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.ia-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.ia-tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelector(`.ia-tab-content[data-tab="${btn.dataset.tab}"]`).classList.add('active');
+    });
+});
+</script>
 <script>
 const _uid        = (window.GYMBROS_USER_ID || 'guest').replace(/\D/g, '');
 const STORAGE_KEY = `gymbros_treinos_${_uid}`;
