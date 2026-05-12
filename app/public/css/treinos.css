@@ -519,3 +519,240 @@ body.light-mode .filtro-btn.active i      { color: #F2F0EE; }
 body.light-mode .modal-header h2 i        { color: #C98B1D; }
 /* Stat boxes: ícone de destaque dourado */
 body.light-mode .stat-box i               { color: #C98B1D; }
+
+/* ==============================
+   PLANO DA IA
+   ============================== */
+.ia-plano-section {
+    margin-bottom: 2rem;
+}
+
+.ia-plano-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.ia-plano-header h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #FFD700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.ia-plano-card {
+    background: #1f1f1f;
+    border-radius: 14px;
+    border-left: 4px solid #FFD700;
+    padding: 1.5rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
+.ia-plano-card h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 0.4rem;
+}
+
+.ia-plano-desc {
+    font-size: 0.88rem;
+    color: #aaa;
+    margin: 0 0 1rem;
+}
+
+.ia-exercicios-lista {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.ia-exercicios-lista li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.5rem 0.8rem;
+    background: #2a2a2a;
+    border-radius: 8px;
+}
+
+.ia-ex-nome {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.ia-ex-detalhe {
+    font-size: 0.78rem;
+    color: #888;
+}
+
+.ia-plano-actions {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    padding-top: 1rem;
+    border-top: 1px solid #2a2a2a;
+}
+
+.btn-iniciar-treino {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #FFD700;
+    color: #1f1f1f;
+    border: none;
+    border-radius: 10px;
+    padding: 0.6rem 1.4rem;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.btn-pedir-ia {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: transparent;
+    color: #FFD700;
+    border: 1.5px solid #FFD700;
+    border-radius: 10px;
+    padding: 0.6rem 1.4rem;
+    font-size: 0.9rem;
+    font-weight: bold;
+    text-decoration: none;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.btn-pedir-ia:hover { background: rgba(255,215,0,0.08); }
+
+.btn-pedir-ia--sm {
+    padding: 0.4rem 1rem;
+    font-size: 0.82rem;
+}
+
+/* Estado vazio */
+.ia-plano-vazio {
+    background: #1f1f1f;
+    border-radius: 14px;
+    border: 1.5px dashed #333;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.ia-plano-vazio i {
+    font-size: 2.5rem;
+    color: #3a3a3a;
+    display: block;
+    margin-bottom: 0.8rem;
+}
+
+.ia-plano-vazio h3 {
+    font-size: 1rem;
+    color: #aaa;
+    margin: 0 0 0.4rem;
+}
+
+.ia-plano-vazio p {
+    font-size: 0.88rem;
+    color: #666;
+    margin: 0 0 1.2rem;
+}
+
+/* Tabs de planos */
+.ia-tabs-nav {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.ia-tab-btn {
+    background: #2a2a2a;
+    border: 1.5px solid #333;
+    color: #aaa;
+    border-radius: 20px;
+    padding: 0.4rem 1.1rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ia-tab-btn:hover  { border-color: #FFD700; color: #FFD700; }
+.ia-tab-btn.active { background: #FFD700; border-color: #FFD700; color: #1f1f1f; }
+
+.ia-tab-content         { display: none; }
+.ia-tab-content.active  { display: block; }
+
+body.light-mode .ia-tab-btn        { background: #DEDAD6; border-color: #C9C7C4; color: #4E4C4A; }
+body.light-mode .ia-tab-btn:hover  { border-color: #C98B1D; color: #C98B1D; }
+body.light-mode .ia-tab-btn.active { background: #C98B1D; border-color: #C98B1D; color: #F2F0EE; }
+
+/* Colapsável registrar */
+.registrar-collapse {
+    background: #1f1f1f;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+}
+
+.registrar-collapse summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.9rem 1.2rem;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #aaa;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    transition: color 0.2s;
+}
+
+.registrar-collapse summary::-webkit-details-marker { display: none; }
+
+.registrar-collapse summary::after {
+    content: '›';
+    margin-left: auto;
+    font-size: 1.1rem;
+    transition: transform 0.2s;
+}
+
+.registrar-collapse[open] summary::after { transform: rotate(90deg); }
+.registrar-collapse summary:hover { color: #FFD700; }
+
+.registrar-collapse-body {
+    padding: 0 1.2rem 1.2rem;
+}
+
+/* Light mode — IA plano */
+body.light-mode .ia-plano-header h2        { color: #C98B1D; }
+body.light-mode .ia-plano-card             { background: #E8E6E3; border-left-color: #C98B1D; }
+body.light-mode .ia-plano-card h3          { color: #1C1A18; }
+body.light-mode .ia-plano-desc             { color: #4E4C4A; }
+body.light-mode .ia-exercicios-lista li    { background: #DEDAD6; }
+body.light-mode .ia-ex-nome               { color: #1C1A18; }
+body.light-mode .ia-ex-detalhe            { color: #7E7C7A; }
+body.light-mode .ia-plano-actions         { border-top-color: #C9C7C4; }
+body.light-mode .btn-iniciar-treino        { background: #C98B1D; color: #F2F0EE; }
+body.light-mode .btn-pedir-ia             { color: #C98B1D; border-color: #C98B1D; }
+body.light-mode .btn-pedir-ia:hover       { background: rgba(201,139,29,0.08); }
+body.light-mode .ia-plano-vazio           { background: #E8E6E3; border-color: #C9C7C4; }
+body.light-mode .ia-plano-vazio h3        { color: #4E4C4A; }
+body.light-mode .ia-plano-vazio p         { color: #7E7C7A; }
+body.light-mode .registrar-collapse       { background: #E8E6E3; border-color: #C9C7C4; }
+body.light-mode .registrar-collapse summary { color: #7E7C7A; }
+body.light-mode .registrar-collapse summary:hover { color: #C98B1D; }

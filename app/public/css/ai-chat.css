@@ -257,3 +257,91 @@ body.light-mode .chat-input-area button:hover { background: #B07A18; }
 body.light-mode .chat-input-area button i   { color: #F2F0EE; }
 /* Ícone do robô no título da página: dourado */
 body.light-mode .dashboard-top h1 i         { color: #C98B1D; }
+
+/* ==============================
+   PLAN PREVIEW
+   ============================== */
+.plan-preview {
+    margin-top: 0.75rem;
+    border-top: 1px solid #444;
+    padding-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.plan-preview-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #FFD700;
+    margin: 0 0 0.35rem;
+    letter-spacing: 0.02em;
+}
+
+.plan-diet-meta {
+    font-size: 0.95rem;
+    color: #aaa;
+    margin: 0 0 0.4rem;
+}
+
+.plan-row {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid #333;
+    font-size: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.plan-row:last-of-type { border-bottom: none; }
+
+.plan-alimento {
+    font-size: 0.9rem;
+    color: #bbb;
+    padding-left: 0.6rem;
+    display: block;
+}
+
+.plan-actions {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.plan-btn {
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    padding: 0.6rem 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.plan-btn-confirm {
+    background: #FFD700;
+    color: #1f1f1f;
+    border: none;
+}
+
+.plan-btn-confirm:hover:not(:disabled) { background: #e6c200; transform: scale(1.04); }
+.plan-btn-confirm:disabled             { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.plan-btn-alter {
+    background: transparent;
+    color: #FFD700;
+    border: 1.5px solid #FFD700;
+}
+
+.plan-btn-alter:hover { background: rgba(255,215,0,0.08); transform: scale(1.04); }
+
+body.light-mode .plan-preview              { border-top-color: #C9C7C4; }
+body.light-mode .plan-preview-title        { color: #C98B1D; }
+body.light-mode .plan-diet-meta            { color: #5a5855; }
+body.light-mode .plan-row                  { border-bottom-color: #DEDAD6; }
+body.light-mode .plan-alimento             { color: #5a5855; }
+body.light-mode .plan-btn-confirm          { background: #C98B1D; color: #F2F0EE; }
+body.light-mode .plan-btn-confirm:hover:not(:disabled) { background: #B07A18; }
+body.light-mode .plan-btn-alter            { color: #C98B1D; border-color: #C98B1D; }
+body.light-mode .plan-btn-alter:hover      { background: rgba(201,139,29,0.08); }

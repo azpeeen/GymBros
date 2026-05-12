@@ -108,6 +108,108 @@
         }
     });
 
+    function appendPlan(reply) {
+        const wrapper = document.createElement('section');
+        wrapper.classList.add('chat-message', 'bot-message');
+
+        const bubble = document.createElement('section');
+        bubble.classList.add('chat-bubble');
+
+        const name = document.createElement('strong');
+        name.textContent = 'GymBot';
+        bubble.appendChild(name);
+
+        const preview = document.createElement('section');
+        preview.classList.add('plan-preview');
+
+        if (reply.type === 'workout') {
+            const plan = reply.plan || {};
+            const title = document.createElement('h3');
+            title.classList.add('plan-preview-title');
+            title.textContent = plan.nome || '';
+            preview.appendChild(title);
+            (plan.exercicios || []).forEach(ex => {
+                const row = document.createElement('section');
+                row.classList.add('plan-row');
+                row.innerHTML = `<strong>${ex.nome_pt}</strong> — ${ex.series}x ${ex.repeticoes} | Descanso: ${ex.descanso_segundos}s | Carga: ${ex.carga_sugerida}`;
+                preview.appendChild(row);
+            });
+        } else {
+            const plan = reply.plan || {};
+            const title = document.createElement('h3');
+            title.classList.add('plan-preview-title');
+            title.textContent = plan.nome || '';
+            preview.appendChild(title);
+            const meta = document.createElement('p');
+            meta.classList.add('plan-diet-meta');
+            meta.textContent = `${plan.objetivo_calorico || 0} kcal/dia · Proteína: ${plan.proteina_diaria_g || 0}g`;
+            preview.appendChild(meta);
+            (plan.refeicoes || []).forEach(ref => {
+                const block = document.createElement('section');
+                block.classList.add('plan-row');
+                const refTitle = document.createElement('strong');
+                refTitle.textContent = `${ref.nome} (${ref.horario_sugerido})`;
+                block.appendChild(refTitle);
+                (ref.alimentos || []).forEach(al => {
+                    const alEl = document.createElement('span');
+                    alEl.classList.add('plan-alimento');
+                    alEl.textContent = `${al.nome} ${al.quantidade} — ${al.kcal} kcal`;
+                    block.appendChild(alEl);
+                });
+                preview.appendChild(block);
+            });
+        }
+
+        bubble.appendChild(preview);
+
+        const actions = document.createElement('section');
+        actions.classList.add('plan-actions');
+
+        const btnSave = document.createElement('button');
+        btnSave.classList.add('plan-btn', 'plan-btn-confirm');
+        btnSave.textContent = 'Confirmar e salvar';
+        btnSave.onclick = async () => {
+            btnSave.disabled = true;
+            btnAlt.disabled = true;
+            try {
+                const res  = await fetch('/ai/plan/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: reply.type, plan: reply.plan })
+                });
+                const data = await res.json();
+                if (!data.ok) {
+                    btnSave.disabled = false;
+                    btnAlt.disabled = false;
+                    btnSave.textContent = data.error || 'Erro ao salvar';
+                } else {
+                    btnSave.textContent = 'Salvo!';
+                }
+            } catch {
+                btnSave.disabled = false;
+                btnAlt.disabled = false;
+                btnSave.textContent = 'Erro ao salvar';
+            }
+        };
+
+        const btnAlt = document.createElement('button');
+        btnAlt.classList.add('plan-btn', 'plan-btn-alter');
+        btnAlt.textContent = 'Quero alterar';
+        btnAlt.onclick = () => {
+            actions.remove();
+            chatInput.value = 'quero alterar o plano';
+            sendMessage();
+        };
+
+        actions.appendChild(btnSave);
+        actions.appendChild(btnAlt);
+        bubble.appendChild(actions);
+
+        wrapper.appendChild(bubble);
+        chatHistory.appendChild(wrapper);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
     function appendMessage(text, sender) {
         const wrapper = document.createElement('section');
         wrapper.classList.add('chat-message', sender === 'user' ? 'user-message' : 'bot-message');
@@ -151,7 +253,12 @@
             });
             const data = await response.json();
             typingIndicator.style.display = 'none';
-            appendMessage(data.reply, 'bot');
+            if (data.reply && (data.reply.type === 'workout' || data.reply.type === 'diet')) {
+                appendPlan(data.reply);
+            } else {
+                const botText = typeof data.reply === 'object' ? data.reply.message : data.reply;
+                appendMessage(botText, 'bot');
+            }
         } catch (err) {
             typingIndicator.style.display = 'none';
             appendMessage('Desculpe, não consegui processar sua mensagem. Tente novamente.', 'bot');

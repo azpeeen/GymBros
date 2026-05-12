@@ -2,11 +2,111 @@
 const express          = require('express');
 const router           = express.Router();
 const Groq             = require('groq-sdk');
+const Fuse             = require('fuse.js');
 const requirePlanLevel = require('../middleware/requirePlanLevel');
 const db               = require('../config/db');
 
 // Planos gymbro e black têm acesso à IA
 const requireIA = requirePlanLevel(['gymbro', 'black']);
+
+// Cria tabelas de planos IA se não existirem
+async function initPlanTables() {
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS workout_plans (
+            id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id         INT UNSIGNED NOT NULL,
+            nome            VARCHAR(255) NOT NULL,
+            descricao       TEXT NULL,
+            exercicios_json JSON NOT NULL,
+            criado_por_ia   TINYINT(1) NOT NULL DEFAULT 0,
+            created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_workout_plan_user_nome (user_id, nome),
+            CONSTRAINT fk_workout_plans_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB
+    `);
+    await db.execute(`
+        CREATE TABLE IF NOT EXISTS diet_plans (
+            id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            user_id           INT UNSIGNED NOT NULL,
+            nome              VARCHAR(255) NOT NULL,
+            objetivo_calorico INT UNSIGNED NULL,
+            proteina_diaria_g INT UNSIGNED NULL,
+            refeicoes_json    JSON NOT NULL,
+            criado_por_ia     TINYINT(1) NOT NULL DEFAULT 0,
+            created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_diet_plan_user_nome (user_id, nome),
+            CONSTRAINT fk_diet_plans_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB
+    `);
+}
+initPlanTables().catch(err => console.error('[ai] initPlanTables:', err.message));
+
+// Cache de exercícios do banco — expira em 24h
+let _exerciseCache    = null;
+let _exerciseCacheAt  = 0;
+const EXERCISE_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function getExercisesCache() {
+    if (_exerciseCache && Date.now() - _exerciseCacheAt < EXERCISE_TTL_MS) {
+        return _exerciseCache;
+    }
+    const [rows] = await db.execute(
+        'SELECT id, name, body_part FROM exercises ORDER BY name'
+    );
+    _exerciseCache   = rows.map(r => ({ id: r.id, name: r.name, body_part: r.body_part }));
+    _exerciseCacheAt = Date.now();
+    return _exerciseCache;
+}
+
+async function detectIntent(groq, message) {
+    try {
+        const res = await groq.chat.completions.create({
+            model: 'llama-3.1-8b-instant',
+            messages: [
+                {
+                    role: 'system',
+                    content: `Classifique a intenção da mensagem do usuário. Retorne APENAS um JSON:
+{"intent": "workout"|"diet"|"chat", "body_parts": ["chest","back","shoulders","upper arms","upper legs","lower legs","waist","cardio"]}
+body_parts só é preenchido quando intent="workout". Inclua todos os grupamentos necessários pro treino pedido.
+Exemplos:
+- "monta upper body" → {"intent":"workout","body_parts":["chest","back","shoulders","upper arms"]}
+- "treino de perna" → {"intent":"workout","body_parts":["upper legs","lower legs"]}
+- "full body" → {"intent":"workout","body_parts":["chest","back","shoulders","upper arms","upper legs","lower legs"]}
+- "me faz uma dieta" → {"intent":"diet","body_parts":[]}
+- "oi tudo bem" → {"intent":"chat","body_parts":[]}`
+                },
+                { role: 'user', content: message }
+            ],
+            response_format: { type: 'json_object' },
+            max_tokens: 100,
+            temperature: 0,
+        });
+        const parsed = JSON.parse(res.choices[0].message.content);
+        return {
+            intent:    parsed.intent    || 'chat',
+            bodyParts: Array.isArray(parsed.body_parts) ? parsed.body_parts : [],
+        };
+    } catch {
+        return { intent: 'chat', bodyParts: [] };
+    }
+}
+
+function buildExerciseBlock(all, bodyParts) {
+    if (!bodyParts || bodyParts.length === 0) return '';
+    const lines = [];
+    for (const bp of bodyParts) {
+        const names = all
+            .filter(e => e.body_part === bp)
+            .slice(0, 40)
+            .map(e => e.name);
+        if (names.length > 0) lines.push(`${bp}: ${names.join(', ')}`);
+    }
+    return lines.join('\n');
+}
 
 const BASE_PROMPT = `Você é um personal trainer virtual chamado GymBot, assistente oficial do GymBros.
 Você ajuda alunos com dúvidas sobre treinos, exercícios, nutrição básica e motivação.
@@ -38,7 +138,7 @@ async function loadImcProfile(userId) {
     };
 }
 
-function buildSystemPrompt(user) {
+async function buildSystemPrompt(user, exerciseBlock, existingPlanNames = []) {
     const imc = user.imc;
     const aval = user.avaliacaoCorporal;
 
@@ -48,6 +148,37 @@ function buildSystemPrompt(user) {
         prompt += `
 
 Observação: o usuário ${user.nome} ainda não preencheu o formulário de perfil IMC. Se ele pedir orientações personalizadas de treino ou nutrição, informe gentilmente que pode preencher o perfil em /imc-form para receber recomendações mais precisas.`;
+        prompt += `
+
+IMPORTANTE: Você SEMPRE deve responder com um JSON válido, sem markdown, sem texto fora do JSON.
+
+Se for uma resposta normal de chat:
+{"type":"chat","message":"sua resposta aqui"}
+
+Se o usuário pedir treino:
+{"type":"workout","message":"texto explicativo","plan":{"nome":"...","descricao":"...","exercicios":[{"exercise_query":"nome em inglês compatível com ExerciseDB","nome_pt":"nome em português","series":3,"repeticoes":"8-12","descanso_segundos":60,"carga_sugerida":"moderada","equipamento":"barbell"}]}}
+
+Se o usuário pedir dieta:
+{"type":"diet","message":"texto explicativo","plan":{"nome":"...","objetivo_calorico":0,"proteina_diaria_g":0,"refeicoes":[{"nome":"...","horario_sugerido":"07:00","alimentos":[{"nome":"...","quantidade":"...","proteina_g":0,"carbo_g":0,"gordura_g":0,"kcal":0}]}]}}
+
+O campo exercise_query SEMPRE em inglês, compatível com ExerciseDB. Nunca invente exercícios fora do padrão.
+IMPORTANTE: O campo exercise_query deve ser EXATAMENTE o nome do exercício como aparece na lista fornecida — com espaços, tudo minúsculo, sem underscores. Exemplo correto: "barbell bench press". Exemplo errado: "barbell_bench_press".
+
+REGRAS OBRIGATÓRIAS PARA GERAÇÃO DE TREINO — NÃO IGNORE:
+- Para treino Upper Body: EXATAMENTE 3 exercícios de peito, 3 de costas, 2 de ombros, 2 de bíceps, 2 de tríceps = 12 exercícios no mínimo
+- Para treino Lower Body: EXATAMENTE 3 de quadríceps, 2 de posterior, 2 de glúteos, 1 de panturrilha = 8 exercícios no mínimo
+- Para Full Body: 2 exercícios por grupamento principal = mínimo 10 exercícios
+- NUNCA monte um treino com menos exercícios do que o mínimo especificado acima
+- Use APENAS exercícios da lista fornecida
+- Varie os equipamentos: não use só barra, inclua halteres, cabos e peso corporal
+Nomenclatura obrigatória dos planos: nomeie sempre como "Treino A — [tipo]", "Treino B — [tipo]", etc. (ex: "Treino A — Upper Body", "Treino B — Lower Body"). Nunca repita letras já usadas.`;
+
+        if (exerciseBlock) {
+            prompt += `\n\nExercícios disponíveis por grupamento muscular (use APENAS estes, com o nome exato no campo exercise_query):\n${exerciseBlock}\n\nNo campo exercise_query use EXATAMENTE o nome desta lista. Nunca invente nomes fora desta lista.`;
+        }
+        if (existingPlanNames.length > 0) {
+            prompt += `\n\nPlanos de treino já salvos do usuário: ${existingPlanNames.join(', ')}. Use a próxima letra disponível na sequência alfabética.`;
+        }
         return prompt;
     }
 
@@ -86,7 +217,57 @@ Avaliação corporal por IA (realizada em ${aval.data || 'data não registrada'}
 
 Use este perfil para personalizar todas as respostas. Não precisa repetir os dados do perfil na resposta, apenas use-os para contextualizar as orientações.`;
 
+    prompt += `
+
+IMPORTANTE: Você SEMPRE deve responder com um JSON válido, sem markdown, sem texto fora do JSON.
+
+Se for uma resposta normal de chat:
+{"type":"chat","message":"sua resposta aqui"}
+
+Se o usuário pedir treino:
+{"type":"workout","message":"texto explicativo","plan":{"nome":"...","descricao":"...","exercicios":[{"exercise_query":"nome em inglês compatível com ExerciseDB","nome_pt":"nome em português","series":3,"repeticoes":"8-12","descanso_segundos":60,"carga_sugerida":"moderada","equipamento":"barbell"}]}}
+
+Se o usuário pedir dieta:
+{"type":"diet","message":"texto explicativo","plan":{"nome":"...","objetivo_calorico":0,"proteina_diaria_g":0,"refeicoes":[{"nome":"...","horario_sugerido":"07:00","alimentos":[{"nome":"...","quantidade":"...","proteina_g":0,"carbo_g":0,"gordura_g":0,"kcal":0}]}]}}
+
+O campo exercise_query SEMPRE em inglês, compatível com ExerciseDB. Nunca invente exercícios fora do padrão.
+IMPORTANTE: O campo exercise_query deve ser EXATAMENTE o nome do exercício como aparece na lista fornecida — com espaços, tudo minúsculo, sem underscores. Exemplo correto: "barbell bench press". Exemplo errado: "barbell_bench_press".
+
+REGRAS OBRIGATÓRIAS PARA GERAÇÃO DE TREINO — NÃO IGNORE:
+- Para treino Upper Body: EXATAMENTE 3 exercícios de peito, 3 de costas, 2 de ombros, 2 de bíceps, 2 de tríceps = 12 exercícios no mínimo
+- Para treino Lower Body: EXATAMENTE 3 de quadríceps, 2 de posterior, 2 de glúteos, 1 de panturrilha = 8 exercícios no mínimo
+- Para Full Body: 2 exercícios por grupamento principal = mínimo 10 exercícios
+- NUNCA monte um treino com menos exercícios do que o mínimo especificado acima
+- Use APENAS exercícios da lista fornecida
+- Varie os equipamentos: não use só barra, inclua halteres, cabos e peso corporal
+Nomenclatura obrigatória dos planos: nomeie sempre como "Treino A — [tipo]", "Treino B — [tipo]", etc. (ex: "Treino A — Upper Body", "Treino B — Lower Body"). Nunca repita letras já usadas.`;
+
+    if (exerciseBlock) {
+        prompt += `\n\nExercícios disponíveis por grupamento muscular (use APENAS estes, com o nome exato no campo exercise_query):\n${exerciseBlock}\n\nNo campo exercise_query use EXATAMENTE o nome desta lista. Nunca invente nomes fora desta lista.`;
+    }
+    if (existingPlanNames.length > 0) {
+        prompt += `\n\nPlanos de treino já salvos do usuário: ${existingPlanNames.join(', ')}. Use a próxima letra disponível na sequência alfabética.`;
+    }
+
     return prompt;
+}
+
+function fuzzyMatchExercise(query, allExercises) {
+    const q = query.toLowerCase().trim();
+
+    const exact = allExercises.find(e => e.name.toLowerCase() === q);
+    if (exact) return exact.name;
+
+    const words = q.split(/\s+/);
+    const allWords = allExercises.find(e => {
+        const n = e.name.toLowerCase();
+        return words.every(w => n.includes(w));
+    });
+    if (allWords) return allWords.name;
+
+    const fuse = new Fuse(allExercises, { keys: ['name'], threshold: 0.4 });
+    const results = fuse.search(query);
+    return results.length > 0 ? results[0].item.name : null;
 }
 
 // GET /ai/chat — renderiza a página do chat
@@ -270,28 +451,62 @@ router.post('/message', requireIA, async (req, res) => {
             sessionId = sessions[0].id;
         }
 
+        // Carrega histórico da sessão (últimas 20 mensagens)
+        const [historico] = await db.execute(
+            'SELECT role, content FROM ai_message WHERE session_id=? ORDER BY created_at ASC LIMIT 20',
+            [sessionId]
+        );
+
         // Salva mensagem do usuário
         await db.execute(
             'INSERT INTO ai_message (session_id, role, content) VALUES (?, "user", ?)',
             [sessionId, message]
         );
 
-        const groq       = new Groq({ apiKey: process.env.GROQ_API_KEY });
+        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+        const { intent, bodyParts } = await detectIntent(groq, message);
+        let exerciseBlock = '';
+        if (intent === 'workout' && bodyParts.length > 0) {
+            const allEx = await getExercisesCache().catch(() => []);
+            exerciseBlock = buildExerciseBlock(allEx, bodyParts);
+        }
+
+        const [planRows] = await db.execute(
+            'SELECT nome FROM workout_plans WHERE user_id = ? ORDER BY created_at ASC',
+            [userId]
+        );
+        const existingPlanNames = planRows.map(r => r.nome);
+
         const completion = await groq.chat.completions.create({
-            model:    'llama-3.3-70b-versatile',
+            model:      'llama-3.3-70b-versatile',
+            max_tokens: 4000,
             messages: [
-                { role: 'system', content: buildSystemPrompt(req.session.user) },
-                { role: 'user',   content: message },
+                { role: 'system', content: await buildSystemPrompt(req.session.user, exerciseBlock, existingPlanNames) },
+                ...historico.map(m => ({
+                    role: m.role,
+                    content: typeof m.content === 'string' && m.content.startsWith('{')
+                        ? (JSON.parse(m.content).message || m.content)
+                        : m.content,
+                })),
+                { role: 'user', content: message },
             ],
+            response_format: { type: 'json_object' },
         });
 
-        const reply  = completion.choices[0].message.content;
-        const tokens = completion.usage?.total_tokens || 0;
+        const rawText = completion.choices[0].message.content;
+        const tokens  = completion.usage?.total_tokens || 0;
 
+        let reply;
+        try {
+            reply = JSON.parse(rawText);
+        } catch {
+            reply = { type: 'chat', message: rawText };
+        }
         // Salva resposta da IA
         await db.execute(
             'INSERT INTO ai_message (session_id, role, content, tokens) VALUES (?, "assistant", ?, ?)',
-            [sessionId, reply, tokens]
+            [sessionId, JSON.stringify(reply), tokens]
         );
         await db.execute(
             'UPDATE ai_session SET total_mensagens=total_mensagens+2, total_tokens=total_tokens+? WHERE id=?',
@@ -302,6 +517,75 @@ router.post('/message', requireIA, async (req, res) => {
     } catch (err) {
         console.error('Erro ao chamar Groq:', err.message);
         return res.json({ reply: 'Desculpe, não consegui processar sua mensagem. Tente novamente.' });
+    }
+});
+
+// POST /ai/plan/save — persiste plano gerado pela IA no banco
+router.post('/plan/save', requireIA, async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ erro: 'Não autorizado.' });
+
+    const { type, plan } = req.body;
+    if (!type || !plan) return res.status(400).json({ erro: 'type e plan são obrigatórios.' });
+
+    const userId = req.session.user.id;
+
+    try {
+        if (type === 'workout') {
+            const exercicios = plan.exercicios || [];
+
+            const nomeLower = (plan.nome || '').toLowerCase();
+            const bodyParts = exercicios.map(e => (e.equipamento || '') + ' ' + (e.exercise_query || '')).join(' ').toLowerCase();
+            const isUpper = nomeLower.includes('upper') ||
+                exercicios.some(e => ['chest', 'back', 'shoulders', 'upper arms'].includes((e.body_part || '').toLowerCase()));
+            const isLower = nomeLower.includes('lower') || nomeLower.includes('perna') ||
+                exercicios.some(e => ['upper legs', 'lower legs'].includes((e.body_part || '').toLowerCase()));
+
+            const minimo = isUpper ? 8 : 6;
+
+            if (exercicios.length < minimo) {
+                return res.status(400).json({ ok: false, error: 'Treino incompleto, peça à IA para adicionar mais exercícios.' });
+            }
+
+            const allEx = await getExercisesCache().catch(() => []);
+            const normalized = exercicios.map(ex => {
+                const match = fuzzyMatchExercise(ex.exercise_query, allEx);
+                return { ...ex, exercise_query: match || ex.exercise_query };
+            });
+
+            const [result] = await db.execute(
+                `INSERT INTO workout_plans (user_id, nome, descricao, exercicios_json, criado_por_ia, created_at)
+                 VALUES (?, ?, ?, ?, 1, NOW())
+                 ON DUPLICATE KEY UPDATE exercicios_json=VALUES(exercicios_json), updated_at=NOW()`,
+                [
+                    userId,
+                    plan.nome || 'Plano de treino IA',
+                    plan.descricao || null,
+                    JSON.stringify(normalized),
+                ]
+            );
+            return res.json({ ok: true, id: result.insertId || null });
+        }
+
+        if (type === 'diet') {
+            const [result] = await db.execute(
+                `INSERT INTO diet_plans (user_id, nome, objetivo_calorico, proteina_diaria_g, refeicoes_json, criado_por_ia, created_at)
+                 VALUES (?, ?, ?, ?, ?, 1, NOW())
+                 ON DUPLICATE KEY UPDATE refeicoes_json=VALUES(refeicoes_json), updated_at=NOW()`,
+                [
+                    userId,
+                    plan.nome || 'Plano alimentar IA',
+                    plan.objetivo_calorico || null,
+                    plan.proteina_diaria_g || null,
+                    JSON.stringify(plan.refeicoes || []),
+                ]
+            );
+            return res.json({ ok: true, id: result.insertId || null });
+        }
+
+        return res.status(400).json({ erro: `Tipo desconhecido: ${type}` });
+    } catch (err) {
+        console.error('[ai/plan/save]', err.message);
+        return res.status(500).json({ erro: 'Erro ao salvar plano.' });
     }
 });
 

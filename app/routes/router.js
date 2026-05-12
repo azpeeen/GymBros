@@ -444,6 +444,7 @@ const SUGESTOES_TREINO = [
 
 router.get('/treinos', requirePlano, async (req, res) => {
     let workouts = [];
+    let iaPlanos = [];
     try {
         [workouts] = await db.execute(
             `SELECT w.*, GROUP_CONCAT(e.nome ORDER BY we.ordem SEPARATOR ', ') AS exercicios_nomes
@@ -458,9 +459,24 @@ router.get('/treinos', requirePlano, async (req, res) => {
     } catch (err) {
         console.error('[treinos]', err);
     }
+    try {
+        const [planRows] = await db.execute(
+            'SELECT * FROM workout_plans WHERE user_id = ? ORDER BY created_at ASC',
+            [req.session.user.id]
+        );
+        iaPlanos = planRows.map(row => ({
+            ...row,
+            exercicios_json: typeof row.exercicios_json === 'string'
+                ? JSON.parse(row.exercicios_json)
+                : row.exercicios_json,
+        }));
+    } catch (err) {
+        console.error('[treinos/iaPlanos]', err);
+    }
     res.render('pages/treinos', {
         user: req.session.user,
         workouts,
+        iaPlanos,
         sugestoes: SUGESTOES_TREINO,
         seo: { title: 'Meus Treinos — GymBros', canonical: '/treinos', robots: 'noindex, nofollow', description: 'Gerencie seus treinos no GymBros.' },
     });
