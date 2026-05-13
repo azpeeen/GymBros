@@ -416,6 +416,27 @@ document.querySelectorAll('.ia-tab-btn').forEach(btn => {
     });
 });
 
+// ── Colapsável mobile: mostrar só 4 exercícios por padrão ─
+if (window.innerWidth <= 768) {
+    document.querySelectorAll('.ia-exercicios-lista').forEach(lista => {
+        const items = lista.querySelectorAll('li');
+        if (items.length <= 4) return;
+        items.forEach((li, i) => { if (i >= 4) li.classList.add('ia-ex-hidden'); });
+        const btn = document.createElement('button');
+        btn.className = 'ia-ex-ver-mais';
+        btn.textContent = `Ver todos (${items.length} exercícios)`;
+        let expanded = false;
+        btn.addEventListener('click', () => {
+            expanded = !expanded;
+            items.forEach((li, i) => {
+                if (i >= 4) li.classList.toggle('ia-ex-hidden', !expanded);
+            });
+            btn.textContent = expanded ? 'Ver menos' : `Ver todos (${items.length} exercícios)`;
+        });
+        lista.after(btn);
+    });
+}
+
 let _confirmResolve = null;
 const confirmModal = document.getElementById('confirmModal');
 document.getElementById('confirmBtnDelete').addEventListener('click', () => {
