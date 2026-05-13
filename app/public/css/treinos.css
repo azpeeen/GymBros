@@ -556,12 +556,21 @@ body.light-mode .confirm-btn-cancel:hover { border-color: #7E7C7A; color: #1C1A1
     .ia-ex-gif-placeholder { height: 130px; }
 }
 
-/* ── Colapsável mobile ────────────────────────────────────── */
-@media (max-width: 768px) {
-    .ia-exercicios-lista li.ia-ex-hidden {
-        display: none;
-    }
+@media (min-width: 1440px) {
+    .ia-exercicios-lista { grid-template-columns: repeat(6, 1fr); }
 }
+
+/* ── Colapsável mobile — animação ─────────────────────────── */
+@keyframes colFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Exercícios da IA */
+@media (max-width: 768px) {
+    .ia-exercicios-lista li.ia-ex-hidden { display: none; }
+}
+.ia-ex-fade-in { animation: colFadeIn 0.22s ease forwards; }
 
 .ia-ex-ver-mais {
     display: none;
@@ -579,9 +588,33 @@ body.light-mode .confirm-btn-cancel:hover { border-color: #7E7C7A; color: #1C1A1
     transition: border-color 0.2s, color 0.2s;
 }
 .ia-ex-ver-mais:hover { border-color: #FFD700; color: #FFD700; }
+@media (max-width: 768px) { .ia-ex-ver-mais { display: block; } }
+
+/* Cards de treino */
 @media (max-width: 768px) {
-    .ia-ex-ver-mais { display: block; }
+    .treino-card-v2.card-hidden { display: none; }
 }
+.treino-card-v2.card-fade-in { animation: colFadeIn 0.22s ease forwards; }
+
+.treinos-ver-mais {
+    display: none;
+    width: 100%;
+    margin: 0.75rem 0 1.2rem;
+    padding: 0.6rem 1rem;
+    background: none;
+    border: 1.5px solid #2e2e2e;
+    border-radius: 10px;
+    color: #aaa;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.2s, color 0.2s;
+}
+.treinos-ver-mais:hover { border-color: #FFD700; color: #FFD700; }
+@media (max-width: 768px) { .treinos-ver-mais { display: block; } }
+body.light-mode .treinos-ver-mais { border-color: #ccc; color: #777; }
+body.light-mode .treinos-ver-mais:hover { border-color: #b8860b; color: #b8860b; }
 body.light-mode .ia-ex-ver-mais { border-color: #ccc; color: #777; }
 body.light-mode .ia-ex-ver-mais:hover { border-color: #b8860b; color: #b8860b; }
 
@@ -695,7 +728,7 @@ body.light-mode .stat-box i               { color: #C98B1D; }
     padding: 0;
     margin: 0 0 1.2rem;
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 16px;
     width: 100%;
     box-sizing: border-box;

@@ -307,3 +307,93 @@ if (notifToggle) {
         showMsg(feedbackEl, 'Lembretes salvos!', true);
     });
 })();
+
+// ─── F10 — Toggle Web Push ────────────────────────────────────────────────────
+(function () {
+    const pushToggle  = document.getElementById('pref-push');
+    const feedbackEl  = document.getElementById('pushFeedback');
+    if (!pushToggle || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+        if (pushToggle) pushToggle.disabled = true;
+        return;
+    }
+
+    const LS_KEY = 'gymbros_push_active';
+
+    async function getVapidKey() {
+        const res  = await fetch('/push/vapid-public-key');
+        const data = await res.json();
+        return data.publicKey;
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+        const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const raw     = atob(base64);
+        return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+    }
+
+    async function subscribeUser() {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+            showMsg(feedbackEl, 'Permissão negada. Habilite nas configurações do navegador.', false);
+            return false;
+        }
+        const vapidKey = await getVapidKey();
+        const reg      = await navigator.serviceWorker.ready;
+        const sub      = await reg.pushManager.subscribe({
+            userVisibleOnly:      true,
+            applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+        const res = await fetch('/push/subscribe', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(sub.toJSON()),
+        });
+        if (!res.ok) throw new Error('Erro ao salvar subscription.');
+        localStorage.setItem(LS_KEY, '1');
+        showMsg(feedbackEl, 'Notificações push ativadas!', true);
+        return true;
+    }
+
+    async function unsubscribeUser() {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+            await fetch('/push/unsubscribe', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ endpoint: sub.endpoint }),
+            });
+            await sub.unsubscribe();
+        }
+        localStorage.removeItem(LS_KEY);
+        showMsg(feedbackEl, 'Notificações push desativadas.', true);
+    }
+
+    // Sincroniza estado visual com a subscription real no browser
+    navigator.serviceWorker.ready.then(async reg => {
+        const sub    = await reg.pushManager.getSubscription();
+        const active = !!sub && Notification.permission === 'granted';
+        if (active) localStorage.setItem(LS_KEY, '1');
+        else        localStorage.removeItem(LS_KEY);
+        pushToggle.classList.toggle('on', active);
+    });
+
+    pushToggle.addEventListener('click', async () => {
+        const isOn = pushToggle.classList.contains('on');
+        pushToggle.disabled = true;
+        try {
+            if (isOn) {
+                await unsubscribeUser();
+                pushToggle.classList.remove('on');
+            } else {
+                const ok = await subscribeUser();
+                pushToggle.classList.toggle('on', ok);
+            }
+        } catch (err) {
+            showMsg(feedbackEl, err.message || 'Erro ao alterar notificações.', false);
+        } finally {
+            pushToggle.disabled = false;
+        }
+    });
+})();

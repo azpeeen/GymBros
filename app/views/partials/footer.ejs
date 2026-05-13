@@ -55,6 +55,17 @@
       </section>
     </section>
 <script src="/js/translate.js"></script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .catch(err => console.error('[SW] erro:', err));
+  });
+}
+</script>
+
+<% if (!(typeof user !== 'undefined' && user)) { %>
 <section id="pwa-install-banner" class="pwa-banner" style="display:none">
   <button id="pwa-dismiss-btn" class="pwa-btn-close" aria-label="Fechar">✕</button>
   <section class="pwa-banner-icon">
@@ -67,12 +78,6 @@
   <button id="pwa-install-btn" class="pwa-btn-install">Instalar</button>
 </section>
 <script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .catch(err => console.error('[SW] erro:', err));
-  });
-}
 (function () {
   const dismissed = localStorage.getItem('pwa_dismissed');
   if (dismissed && Date.now() - parseInt(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
@@ -119,6 +124,69 @@ if ('serviceWorker' in navigator) {
   }
 })();
 </script>
+<% } %>
+
+<% if (typeof user !== 'undefined' && user) { %>
+<section id="push-notif-banner" class="push-notif-banner" style="display:none" aria-label="Ativar notificações">
+  <button id="push-notif-close" class="push-notif-close" aria-label="Fechar">✕</button>
+  <span class="push-notif-icon">🔔</span>
+  <section class="push-notif-text">
+    <strong>Notificações de treino</strong>
+    Receba alertas de check-in e dicas direto no celular
+  </section>
+  <button id="push-notif-btn" class="push-notif-action">Ativar</button>
+</section>
+<script>
+(function () {
+  if (sessionStorage.getItem('push_banner_dismissed')) return;
+  if (!('Notification' in window) || Notification.permission !== 'default') return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (window.matchMedia('(display-mode: standalone)').matches === false && window.innerWidth > 768) return;
+
+  var banner  = document.getElementById('push-notif-banner');
+  var btnOk   = document.getElementById('push-notif-btn');
+  var btnX    = document.getElementById('push-notif-close');
+
+  function dismiss() {
+    banner.style.display = 'none';
+    sessionStorage.setItem('push_banner_dismissed', '1');
+  }
+
+  function urlB64ToUint8(b64) {
+    var pad  = '='.repeat((4 - b64.length % 4) % 4);
+    var b64c = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+    return Uint8Array.from([...atob(b64c)].map(function(c){ return c.charCodeAt(0); }));
+  }
+
+  btnOk.addEventListener('click', async function () {
+    var perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      try {
+        var res        = await fetch('/push/vapid-public-key');
+        var data       = await res.json();
+        var reg        = await navigator.serviceWorker.ready;
+        var sub        = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8(data.publicKey)
+        });
+        await fetch('/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sub.toJSON())
+        });
+      } catch(e) {}
+    }
+    dismiss();
+  });
+
+  btnX.addEventListener('click', dismiss);
+
+  setTimeout(function () {
+    if (banner) banner.style.display = 'flex';
+  }, 4000);
+})();
+</script>
+<% } %>
 <script>
 (function () {
   const consent = localStorage.getItem('cookie_consent');

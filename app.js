@@ -98,6 +98,10 @@ app.use('/api/admin', rotasAdminAPI);
 const rotasSuporte = require('./app/routes/suporte');
 app.use('/api/suporte', rotasSuporte);
 
+const rotasPush = require('./app/routes/push');
+app.use('/push', rotasPush);
+app.use('/internal/push', rotasPush);
+
 app.listen(port, () => {
   console.log(`Servidor ouvindo na porta ${port}\nhttp://localhost:${port}`);
 });
