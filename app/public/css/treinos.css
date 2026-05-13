@@ -556,6 +556,35 @@ body.light-mode .confirm-btn-cancel:hover { border-color: #7E7C7A; color: #1C1A1
     .ia-ex-gif-placeholder { height: 130px; }
 }
 
+/* ── Colapsável mobile ────────────────────────────────────── */
+@media (max-width: 768px) {
+    .ia-exercicios-lista li.ia-ex-hidden {
+        display: none;
+    }
+}
+
+.ia-ex-ver-mais {
+    display: none;
+    width: 100%;
+    margin-top: 0.75rem;
+    padding: 0.55rem 1rem;
+    background: none;
+    border: 1.5px solid #2e2e2e;
+    border-radius: 10px;
+    color: #aaa;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.2s, color 0.2s;
+}
+.ia-ex-ver-mais:hover { border-color: #FFD700; color: #FFD700; }
+@media (max-width: 768px) {
+    .ia-ex-ver-mais { display: block; }
+}
+body.light-mode .ia-ex-ver-mais { border-color: #ccc; color: #777; }
+body.light-mode .ia-ex-ver-mais:hover { border-color: #b8860b; color: #b8860b; }
+
 /* ==============================
    LIGHT MODE — Treinos
    ============================== */
