@@ -695,7 +695,7 @@ body.light-mode .stat-box i               { color: #C98B1D; }
     padding: 0;
     margin: 0 0 1.2rem;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(6, 1fr);
     gap: 16px;
     width: 100%;
     box-sizing: border-box;
