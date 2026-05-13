@@ -85,6 +85,16 @@
                     <ul class="ia-exercicios-lista">
                         <% plano.exercicios_json.forEach(ex => { %>
                         <li>
+                            <% if (ex.gif_url) { %>
+                            <section class="ia-ex-gif">
+                                <img src="<%= ex.gif_url %>" alt="<%= ex.nome_pt %>">
+                            </section>
+                            <% } else { %>
+                            <section class="ia-ex-gif-placeholder">
+                                <span class="placeholder-icon">🏋️</span>
+                                <span class="placeholder-text">GIF em breve</span>
+                            </section>
+                            <% } %>
                             <section class="ia-ex-nome"><%= ex.nome_pt %></section>
                             <section class="ia-ex-detalhe"><%= ex.series %>x<%= ex.repeticoes %> · Descanso: <%= ex.descanso_segundos %>s · <%= ex.carga_sugerida %></section>
                         </li>
