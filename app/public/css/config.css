@@ -5,10 +5,18 @@
 /* ─── Grid de cards ──────────────────────────────────── */
 .cfg-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
-    align-items: start;
+    align-items: stretch;
     width: 100%;
+}
+
+/* Lembretes — linha 3, largura total, centralizado */
+#cfg-lembretes {
+    grid-column: 1 / -1;
+    max-width: 600px;
+    width: 100%;
+    margin-inline: auto;
 }
 
 /* ─── Card base ──────────────────────────────────────── */
@@ -316,9 +324,19 @@ body.light-mode .cfg-btn-save i,
 body.light-mode .cfg-btn-primary i    { color: #F2F0EE; }
 body.light-mode .cfg-danger-btn i     { color: #F2F0EE; }
 
+/* ─── Card description ───────────────────────────────── */
+.cfg-card-desc {
+    font-size: .8rem;
+    color: #666;
+    margin: -.5rem 0 1.25rem;
+    line-height: 1.5;
+}
+body.light-mode .cfg-card-desc { color: #888; }
+
 /* ─── Responsive ─────────────────────────────────────── */
-@media (max-width: 900px) {
+@media (max-width: 860px) {
     .cfg-grid { grid-template-columns: 1fr; }
+    #cfg-lembretes { max-width: 100%; }
 }
 @media (max-width: 600px) {
     .cfg-card { padding: 1.25rem; }

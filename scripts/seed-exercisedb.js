@@ -1,8 +1,8 @@
 'use strict';
 /**
- * Seed de exercícios — ExerciseDB V1 pública → MySQL + Cloudinary
+ * Seed WorkoutX → exercises + exercise_media
  * Uso: node scripts/seed-exercisedb.js
- * Pare o servidor antes de rodar para não exceder max_user_connections.
+ * Persiste offset em scripts/.seed-cursor.json entre rodadas.
  */
 require('dotenv').config();
 
@@ -10,39 +10,49 @@ const mysql      = require('mysql2/promise');
 const cloudinary = require('cloudinary').v2;
 const https      = require('https');
 const http       = require('http');
+const fs         = require('fs');
+const path       = require('path');
 
-// ── Cloudinary ────────────────────────────────────────────────────────────────
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key:    process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ── Constantes ────────────────────────────────────────────────────────────────
-const EXERCISEDB_BASE = 'https://exercisedb.p.rapidapi.com/exercises';
-const BATCH_SIZE     = 10;
+const WORKOUTX_KEY      = process.env.WORKOUTX_KEY;
+const WORKOUTX_BASE     = 'https://api.workoutxapp.com/v1/exercises';
+const PAGE_LIMIT        = 10;
+const BATCH_SIZE        = 5;
 const CLOUDINARY_FOLDER = 'gymbros/exercises';
+const CURSOR_FILE       = path.join(__dirname, '.seed-cursor.json');
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+function loadOffset() {
+    try { return JSON.parse(fs.readFileSync(CURSOR_FILE, 'utf8')).offset ?? 0; }
+    catch { return 0; }
+}
 
-/**
- * Faz um GET HTTP/HTTPS e retorna um Buffer com o corpo da resposta.
- * Segue redirects automaticamente (até 5 saltos).
- */
-function fetchBuffer(url, redirectsLeft = 5, extraHeaders = {}) {
+function saveOffset(offset) {
+    fs.writeFileSync(CURSOR_FILE, JSON.stringify({ offset }), 'utf8');
+}
+
+function deleteCursor() {
+    try { fs.unlinkSync(CURSOR_FILE); } catch {}
+}
+
+function fetchBuffer(url, extraHeaders = {}, redirectsLeft = 5) {
     return new Promise((resolve, reject) => {
         if (redirectsLeft <= 0) return reject(new Error('Muitos redirects: ' + url));
-
         const lib = url.startsWith('https') ? https : http;
-        const headers = { 'User-Agent': 'GymBros-Seed/1.0', ...extraHeaders };
-        lib.get(url, { headers }, (res) => {
-            // Segue redirect
+        lib.get(url, { headers: { 'User-Agent': 'GymBros-Seed/1.0', ...extraHeaders }, rejectUnauthorized: false }, (res) => {
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                return resolve(fetchBuffer(res.headers.location, redirectsLeft - 1, extraHeaders));
+                return resolve(fetchBuffer(res.headers.location, {}, redirectsLeft - 1));
             }
             if (res.statusCode !== 200) {
                 res.resume();
-                return reject(new Error(`HTTP ${res.statusCode} em ${url}`));
+                return reject(Object.assign(
+                    new Error(`HTTP ${res.statusCode} em ${url}`),
+                    { statusCode: res.statusCode }
+                ));
             }
             const chunks = [];
             res.on('data', (c) => chunks.push(c));
@@ -52,187 +62,79 @@ function fetchBuffer(url, redirectsLeft = 5, extraHeaders = {}) {
     });
 }
 
-/**
- * Faz GET JSON paginado da ExerciseDB (10 por página) e retorna todos os exercícios.
- */
-async function fetchExercises() {
-    const rapidHeaders = {
-        'X-RapidAPI-Key':  process.env.RAPIDAPI_KEY,
-        'X-RapidAPI-Host': 'exercisedb.p.rapidapi.com',
-    };
-
-    const PAGE    = 10;
-    let offset    = 0;
-    let all       = [];
-    let firstDone = false;
-
-    console.log('[seed] Buscando exercícios da ExerciseDB (paginado, 10/req)…');
-
-    while (true) {
-        const url = `${EXERCISEDB_BASE}?limit=${PAGE}&offset=${offset}`;
-        const buf  = await fetchBuffer(url, 5, rapidHeaders);
-        const body = JSON.parse(buf.toString('utf8'));
-
-        const page =
-            body?.data?.exercises ??
-            body?.exercises       ??
-            (Array.isArray(body) ? body : null);
-
-        if (!page) throw new Error('Formato de resposta inesperado da ExerciseDB');
-
-        if (!firstDone && page.length > 0) {
-            console.log('[seed] Primeiro exercício (campos disponíveis):');
-            console.log(JSON.stringify(page[0], null, 2));
-            firstDone = true;
-        }
-
-        all = all.concat(page);
-        console.log(`[seed] offset=${offset} → ${page.length} recebidos (total acumulado: ${all.length})`);
-
-        if (page.length < PAGE) break;
-        offset += PAGE;
-    }
-
-    console.log(`[seed] Total final: ${all.length} exercícios.`);
-    return all;
+function fetchPage(offset) {
+    const url = `${WORKOUTX_BASE}?limit=${PAGE_LIMIT}&offset=${offset}`;
+    return fetchBuffer(url, { 'X-WorkoutX-Key': WORKOUTX_KEY })
+        .then(buf => {
+            const body = JSON.parse(buf.toString('utf8'));
+            return Array.isArray(body) ? body : (body.data ?? []);
+        });
 }
 
-/**
- * Faz upload de um Buffer GIF para o Cloudinary via stream e retorna a URL segura.
- */
-function uploadBufferToCloudinary(buffer, publicId) {
+function uploadToCloudinary(buffer, publicId) {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            {
-                folder:         CLOUDINARY_FOLDER,
-                public_id:      publicId,
-                resource_type:  'image',
-                format:         'gif',
-                overwrite:      false,
-            },
-            (error, result) => {
-                if (error) return reject(error);
-                resolve(result.secure_url);
-            }
+            { folder: CLOUDINARY_FOLDER, public_id: publicId, resource_type: 'image', format: 'gif', overwrite: true },
+            (error, result) => { if (error) return reject(error); resolve(result.secure_url); }
         );
         stream.end(buffer);
     });
 }
 
-/**
- * Cria as tabelas no banco caso ainda não existam.
- */
-async function createTables(conn) {
-    await conn.execute(`
-        CREATE TABLE IF NOT EXISTS exercises (
-            id                VARCHAR(50)  PRIMARY KEY,
-            name              VARCHAR(255) NOT NULL,
-            body_part         VARCHAR(100),
-            target_muscle     VARCHAR(100),
-            equipment_name    VARCHAR(100),
-            instructions_json JSON
-        )
-    `);
+async function processOne(conn, ex, alreadyDone, index) {
+    const exerciseId = String(ex.id ?? '').trim();
+    const name       = String(ex.name ?? '').trim();
+    const gifUrl     = String(ex.gifUrl ?? '').trim();
 
-    await conn.execute(`
-        CREATE TABLE IF NOT EXISTS exercise_media (
-            exercise_id        VARCHAR(50)  PRIMARY KEY,
-            cloudinary_gif_url VARCHAR(500) NOT NULL,
-            synced_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (exercise_id) REFERENCES exercises(id)
-        )
-    `);
+    if (!exerciseId || !name || !gifUrl) return 'skip';
+    if (alreadyDone.has(exerciseId)) return 'skip';
 
-    console.log('[seed] Tabelas verificadas/criadas.');
-}
+    const bodyPart   = String(ex.bodyPart   ?? '').toLowerCase() || null;
+    const target     = String(ex.target     ?? '').toLowerCase() || null;
+    const equipment  = String(ex.equipment  ?? '').toLowerCase() || null;
+    const instrucoes = Array.isArray(ex.instructions) ? JSON.stringify(ex.instructions) : null;
 
-/**
- * Processa um único exercício: INSERT no MySQL + download GIF + upload Cloudinary.
- * Retorna true em caso de sucesso, false se houve erro no GIF/Cloudinary (mas o
- * registro na tabela exercises é salvo mesmo assim).
- */
-async function processExercise(conn, ex, index, total) {
-    const id           = String(ex.id ?? ex.exerciseId ?? '').trim();
-    const name         = String(ex.name         ?? '').trim();
-    const bodyPart     = String(ex.bodyPart      ?? ex.body_part     ?? '').trim();
-    const target       = String(ex.target        ?? ex.target_muscle  ?? '').trim();
-    const equipment    = String(ex.equipment     ?? ex.equipment_name ?? '').trim();
-    const instructions = ex.instructions ?? [];
-    const gifUrl       = String(ex.gifUrl        ?? ex.gif_url       ?? '').trim();
-
-    if (!id || !name) {
-        console.warn(`[${index}/${total}] exercício sem id/name — ignorado`);
-        return false;
-    }
-
-    // ── INSERT exercises (ignora duplicatas) ──────────────────────────────────
-    await conn.execute(
-        `INSERT IGNORE INTO exercises
-            (id, name, body_part, target_muscle, equipment_name, instructions_json)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [id, name, bodyPart, target, equipment, JSON.stringify(instructions)]
-    );
-
-    // ── Verifica se já tem mídia salva ────────────────────────────────────────
-    const [mediaRows] = await conn.execute(
-        'SELECT exercise_id FROM exercise_media WHERE exercise_id = ?', [id]
-    );
-    if (mediaRows.length > 0) {
-        console.log(`[${index}/${total}] ${name} — já sincronizado, pulando GIF`);
-        return true;
-    }
-
-    // ── Download + Upload GIF ─────────────────────────────────────────────────
-    if (!gifUrl) {
-        console.warn(`[${index}/${total}] ${name} — sem gifUrl, pulando`);
-        return true;
-    }
-
-    try {
-        const gifBuffer = await fetchBuffer(gifUrl);
-        const publicId  = `exercise_${id}`;
-        const cdnUrl    = await uploadBufferToCloudinary(gifBuffer, publicId);
-
-        await conn.execute(
-            `INSERT INTO exercise_media (exercise_id, cloudinary_gif_url)
-             VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE cloudinary_gif_url = VALUES(cloudinary_gif_url), synced_at = CURRENT_TIMESTAMP`,
-            [id, cdnUrl]
-        );
-
-        console.log(`[${index}/${total}] ${name} — ok`);
-        return true;
-    } catch (err) {
-        console.error(`[${index}/${total}] ${name} — ERRO GIF/Cloudinary: ${err.message}`);
-        return false;
-    }
-}
-
-/**
- * Processa a lista em batches de BATCH_SIZE para não sobrecarregar.
- */
-async function processBatches(conn, exercises) {
-    const total  = exercises.length;
-    let success  = 0;
-    let failures = 0;
-
-    for (let i = 0; i < total; i += BATCH_SIZE) {
-        const batch = exercises.slice(i, i + BATCH_SIZE);
-
-        const results = await Promise.allSettled(
-            batch.map((ex, j) => processExercise(conn, ex, i + j + 1, total))
-        );
-
-        for (const r of results) {
-            if (r.status === 'fulfilled' && r.value === true) success++;
-            else failures++;
+    let buffer;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            buffer = await fetchBuffer(gifUrl, { 'X-WorkoutX-Key': WORKOUTX_KEY });
+            break;
+        } catch (err) {
+            if (err.statusCode === 429 && attempt < 3) {
+                console.warn(`[${index}] ${name} — 429 no GIF, tentativa ${attempt}/3, aguardando 60s…`);
+                await new Promise(r => setTimeout(r, 60_000));
+            } else if (err.statusCode === 404) {
+                console.warn(`[${index}] ${name} — sem GIF (404)`);
+                return 'skip';
+            } else {
+                throw err;
+            }
         }
     }
+    if (!buffer) { console.error(`[${index}] ${name} — 429 após 3 tentativas`); return 'error'; }
 
-    return { success, failures };
+    try {
+        const cdnUrl = await uploadToCloudinary(buffer, `exercise_${exerciseId}`);
+
+        await conn.execute(
+            `INSERT IGNORE INTO exercises (id, name, body_part, target_muscle, equipment_name, instructions_json)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [exerciseId, name, bodyPart, target, equipment, instrucoes]
+        );
+        await conn.execute(
+            'INSERT IGNORE INTO exercise_media (exercise_id, cloudinary_gif_url) VALUES (?, ?)',
+            [exerciseId, cdnUrl]
+        );
+
+        alreadyDone.add(exerciseId);
+        console.log(`[${index}] ${name} — ok | ${cdnUrl}`);
+        return 'ok';
+    } catch (err) {
+        console.error(`[${index}] ${name} — ERRO: ${err.message}`);
+        return 'error';
+    }
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
     const conn = await mysql.createConnection({
         host:     process.env.DB_HOST,
@@ -243,22 +145,82 @@ async function main() {
         timezone: '-03:00',
     });
 
-    console.log('[seed] Conectado ao MySQL — Clever Cloud');
+    console.log('[seed] Conectado ao MySQL');
 
     try {
-        await createTables(conn);
+        const [mediaRows] = await conn.execute('SELECT exercise_id FROM exercise_media');
+        const alreadyDone = new Set(mediaRows.map(r => r.exercise_id));
 
-        const exercises = await fetchExercises();
-        const { success, failures } = await processBatches(conn, exercises);
+        let offset   = loadOffset();
+        let success  = 0;
+        let skipped  = 0;
+        let failures = 0;
+        let page     = 0;
 
-        console.log(`\n[seed] Concluído. Sucesso: ${success} | Falhas: ${failures} | Total: ${exercises.length}`);
+        console.log(`[seed] Iniciando a partir do offset ${offset}…\n`);
+
+        while (true) {
+            let items;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    items = await fetchPage(offset);
+                    break;
+                } catch (err) {
+                    if (err.statusCode === 429 && attempt < 3) {
+                        console.warn(`[seed] 429 na página (tentativa ${attempt}/3) — aguardando 120s…`);
+                        await new Promise(r => setTimeout(r, 120_000));
+                    } else if (err.statusCode === 429) {
+                        console.warn(`[seed] 429 após 3 tentativas — offset ${offset} salvo.`);
+                        saveOffset(offset);
+                        break;
+                    } else {
+                        throw err;
+                    }
+                }
+            }
+            if (!items) break;
+
+            if (!Array.isArray(items) || items.length === 0) {
+                console.log('[seed] Sem mais exercícios — seed completo!');
+                deleteCursor();
+                break;
+            }
+
+            page++;
+            console.log(`[seed] Página ${page} (offset ${offset}) → ${items.length} exercícios`);
+
+            for (let i = 0; i < items.length; i += BATCH_SIZE) {
+                const batch   = items.slice(i, i + BATCH_SIZE);
+                const results = await Promise.allSettled(
+                    batch.map((ex, j) => processOne(conn, ex, alreadyDone, offset + i + j + 1))
+                );
+                for (const r of results) {
+                    const val = r.status === 'fulfilled' ? r.value : 'error';
+                    if      (val === 'ok')   success++;
+                    else if (val === 'skip') skipped++;
+                    else                     failures++;
+                }
+            }
+
+            offset += items.length;
+            saveOffset(offset);
+            await new Promise(r => setTimeout(r, 1_000));
+        }
+
+        const [[{ finalCount }]] = await conn.execute('SELECT COUNT(*) as finalCount FROM exercise_media');
+        console.log(`\n[seed] Concluído.`);
+        console.log(`  Uploads    : ${success}`);
+        console.log(`  Pulados    : ${skipped}`);
+        console.log(`  Falhas     : ${failures}`);
+        console.log(`  No banco   : ${finalCount}`);
+        console.log(`  Próx offset: ${offset}`);
     } finally {
         await conn.end();
         console.log('[seed] Conexão encerrada.');
     }
 }
 
-main().catch((err) => {
+main().catch(err => {
     console.error('[seed] Erro fatal:', err.message);
     process.exit(1);
 });

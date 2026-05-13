@@ -5,6 +5,7 @@ const path       = require('path');
 const multer     = require('multer');
 const QRCode     = require('qrcode');
 const bcrypt     = require('bcrypt');
+const Fuse       = require('fuse.js');
 const { body, validationResult } = require('express-validator');
 const { enviarBoleto }   = require('../services/email');
 const { gerarBoletoPDF } = require('../services/pdf');
@@ -460,6 +461,32 @@ const SUGESTOES_TREINO = [
     { id: 9, nome: 'HIIT',                  duracao: 25, tipo: 'Cardio',      icone: 'fa-fire',       exercicios: ['Burpee', 'Mountain climber', 'Jumping jack', 'Sprint'] }
 ];
 
+let _gifCache   = null;
+let _gifCacheAt = 0;
+const GIF_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function getGifCache() {
+    if (_gifCache && Date.now() - _gifCacheAt < GIF_TTL_MS) return _gifCache;
+    const [rows] = await db.execute(
+        `SELECT e.name, em.cloudinary_gif_url
+         FROM exercises e
+         JOIN exercise_media em ON em.exercise_id = e.id`
+    );
+    _gifCache   = rows.map(r => ({ name: r.name, gif_url: r.cloudinary_gif_url }));
+    _gifCacheAt = Date.now();
+    return _gifCache;
+}
+
+async function lookupGif(query, cache) {
+    if (!query) return null;
+    const q = query.toLowerCase().trim();
+    const exact = cache.find(r => r.name.toLowerCase() === q);
+    if (exact) return exact.gif_url;
+    const fuse = new Fuse(cache, { keys: ['name'], threshold: 0.4 });
+    const results = fuse.search(query);
+    return results.length > 0 ? results[0].item.gif_url : null;
+}
+
 router.get('/treinos', requirePlano, async (req, res) => {
     let workouts = [];
     let iaPlanos = [];
@@ -490,6 +517,16 @@ router.get('/treinos', requirePlano, async (req, res) => {
         }));
     } catch (err) {
         console.error('[treinos/iaPlanos]', err);
+    }
+    try {
+        const gifCache = await getGifCache();
+        for (const plano of iaPlanos) {
+            for (const ex of plano.exercicios_json) {
+                ex.gif_url = await lookupGif(ex.exercise_query, gifCache);
+            }
+        }
+    } catch (err) {
+        console.error('[treinos/gifs]', err);
     }
     res.render('pages/treinos', {
         user: req.session.user,
