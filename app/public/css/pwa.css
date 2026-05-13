@@ -81,6 +81,79 @@
 }
 .pwa-btn-close:hover { color: #ccc; }
 
+/* ── Push notification opt-in banner (área do aluno) ── */
+.push-notif-banner {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 320px;
+  width: calc(100% - 32px);
+  background: #1a1a1a;
+  border: 1px solid #2e2e2e;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.72), 0 2px 8px rgba(0,0,0,.4);
+  padding: 14px 14px 14px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: slideInRight 0.35s cubic-bezier(.22,.68,0,1.2);
+}
+.push-notif-icon {
+  font-size: 1.45rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.push-notif-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.push-notif-text strong {
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.push-notif-text {
+  color: #bbb;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+.push-notif-action {
+  background: #FFD700;
+  color: #1a1a1a;
+  border: none;
+  border-radius: 10px;
+  padding: 7px 13px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+.push-notif-action:hover  { background: #e6c200; }
+.push-notif-action:active { transform: scale(0.95); }
+.push-notif-close {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.push-notif-close:hover { color: #aaa; }
+
 /* ── Cookie consent banner ── */
 .cookie-banner {
   position: fixed;

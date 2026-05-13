@@ -48,6 +48,32 @@ self.addEventListener('message', event => {
     agendarSono(payload && payload.ativo ? payload.horario : null);
   }
 });
+// ── F10 — Web Push ───────────────────────────────────────────────────────────
+self.addEventListener('push', event => {
+  let data = { title: 'GymBros', body: 'Nova notificação', url: '/' };
+  try { if (event.data) data = { ...data, ...event.data.json() }; } catch {}
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/images/logo.png',
+      badge: '/images/favicon.ico',
+      tag: 'gymbros-push',
+      data: { url: data.url },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const match = list.find(c => c.url.includes(url) && 'focus' in c);
+      if (match) return match.focus();
+      return clients.openWindow(url);
+    })
+  );
+});
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATIC_ASSETS = [

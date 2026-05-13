@@ -34,7 +34,8 @@
     "nodemailer": "^8.0.4",
     "pdfkit": "^0.18.0",
     "qrcode": "^1.5.4",
-    "resend": "^6.10.0"
+    "resend": "^6.10.0",
+    "web-push": "^3.6.7"
   },
   "keywords": [],
   "description": "",
