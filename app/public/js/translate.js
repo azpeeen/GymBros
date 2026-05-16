@@ -58,7 +58,7 @@ const dictionary = {
     'form.terms':      { pt: 'Aceito os termos de uso', en: 'I accept the terms of use', es: 'Acepto los términos de uso' },
 
     /* ── footer ─────────────────────────────────────────── */
-    'footer.copy':    { pt: '© 2025 GymBros. Todos os direitos reservados.', en: '© 2025 GymBros. All rights reserved.', es: '© 2025 GymBros. Todos los derechos reservados.' },
+    'footer.copy':    { pt: '© 2026 GymBros. Todos os direitos reservados.', en: '© 2026 GymBros. All rights reserved.', es: '© 2026 GymBros. Todos los derechos reservados.' },
     'footer.privacy': { pt: 'Política de Privacidade', en: 'Privacy Policy',   es: 'Política de Privacidad' },
     'footer.terms':   { pt: 'Termos de Serviço',       en: 'Terms of Service', es: 'Términos de Servicio' },
     'footer.faq':     { pt: 'FAQ',                     en: 'FAQ',              es: 'Preguntas Frecuentes' },
@@ -81,37 +81,160 @@ const dictionary = {
     'index.mod.marciais':   { pt: 'ARTES MARCIAIS', en: 'MARTIAL ARTS',  es: 'ARTES MARCIALES' },
     'index.mod.fitdance':   { pt: 'FITDANCE',       en: 'FITDANCE',      es: 'FITDANCE' },
     'index.mod.meditacao':  { pt: 'MEDITAÇÃO',      en: 'MEDITATION',    es: 'MEDITACIÓN' },
-    'index.partners.title': { pt: 'Academias Parceiras', en: 'Partner Gyms', es: 'Gimnasios Asociados' },
+
+    /* ── categorias musculares ──────────────────────────── */
+    'index.categories.title':    { pt: 'Treine cada músculo do seu corpo',            en: 'Train every muscle in your body',              es: 'Entrena cada músculo de tu cuerpo' },
+    'index.categories.subtitle': { pt: '1.321 exercícios com GIF para cada grupo muscular', en: '1,321 GIF exercises for every muscle group', es: '1.321 ejercicios con GIF para cada grupo muscular' },
+    'index.cat.peito':     { pt: 'Peito',     en: 'Chest',     es: 'Pecho' },
+    'index.cat.costas':    { pt: 'Costas',    en: 'Back',      es: 'Espalda' },
+    'index.cat.pernas':    { pt: 'Pernas',    en: 'Legs',      es: 'Piernas' },
+    'index.cat.ombros':    { pt: 'Ombros',    en: 'Shoulders', es: 'Hombros' },
+    'index.cat.biceps':    { pt: 'Bíceps',    en: 'Biceps',    es: 'Bíceps' },
+    'index.cat.triceps':   { pt: 'Tríceps',   en: 'Triceps',   es: 'Tríceps' },
+    'index.cat.core':      { pt: 'Core',      en: 'Core',      es: 'Core' },
+    'index.cat.cardio':    { pt: 'Cardio',    en: 'Cardio',    es: 'Cardio' },
+    'index.cat.gluteos':   { pt: 'Glúteos',   en: 'Glutes',    es: 'Glúteos' },
+    'index.cat.antebraco': { pt: 'Antebraço', en: 'Forearm',   es: 'Antebrazo' },
+    'index.cat.pescoco':   { pt: 'Pescoço',   en: 'Neck',      es: 'Cuello' },
+
     'index.plans.title': {
-        pt: 'UM PLANO. VÁRIAS ACADEMIAS. TREINOS DO SEU JEITO.',
-        en: 'ONE PLAN. MULTIPLE GYMS. TRAINING YOUR WAY.',
-        es: 'UN PLAN. VARIAS ACADEMIAS. ENTRENA A TU MANERA.'
+        pt: 'TREINO INTELIGENTE. IA PERSONALIZADA. DO SEU JEITO.',
+        en: 'SMART TRAINING. PERSONALIZED AI. YOUR WAY.',
+        es: 'ENTRENAMIENTO INTELIGENTE. IA PERSONALIZADA. A TU MANERA.'
     },
     'index.plans.desc': {
-        pt: 'Com o GymBros Pass, você escolhe como e onde quer treinar, sem se prender a uma única academia. A gente cuida da flexibilidade, você cuida do foco. Conheça nossos planos e encontre o que combina com sua rotina',
-        en: 'With GymBros Pass, you choose how and where to train, without being tied to one gym. We handle the flexibility, you handle the focus. Explore our plans and find the one that fits your routine.',
-        es: 'Con GymBros Pass, eliges cómo y dónde entrenar, sin estar atado a un solo gimnasio. Nosotros nos encargamos de la flexibilidad, tú del enfoque. Conoce nuestros planes y encuentra el que se adapta a tu rutina.'
+        pt: 'Com o GymBros, você treina com inteligência artificial ao seu lado: planos de treino, dieta e acompanhamento personalizados. A gente cuida da tecnologia, você cuida da evolução. Conheça nossos planos e encontre o que combina com sua rotina.',
+        en: 'With GymBros, you train with artificial intelligence by your side: personalized workout plans, diet, and tracking. We handle the technology, you handle the progress. Explore our plans and find the one that fits your routine.',
+        es: 'Con GymBros, entrenas con inteligencia artificial a tu lado: planes de entrenamiento, dieta y seguimiento personalizados. Nosotros nos encargamos de la tecnología, tú del progreso. Conoce nuestros planes y encuentra el que se adapta a tu rutina.'
     },
     'index.plans.btn': { pt: 'VER PLANOS', en: 'SEE PLANS', es: 'VER PLANES' },
 
-    /* ── sobre (about) ──────────────────────────────────── */
-    'about.history.title': { pt: 'Nossa História', en: 'Our Story', es: 'Nuestra Historia' },
-    'about.history.desc': {
-        pt: 'Fundada com o objetivo de transformar a forma como as pessoas encaram o exercício físico, a GymBros nasceu da ideia de unir qualidade, flexibilidade e comunidade. Queremos que cada treino seja uma experiência única, que inspire nossos alunos a cuidar da saúde e se superar todos os dias.',
-        en: 'Founded with the goal of transforming how people approach physical exercise, GymBros was born from the idea of uniting quality, flexibility and community. We want every workout to be a unique experience that inspires our members to take care of their health and surpass themselves every day.',
-        es: 'Fundada con el objetivo de transformar la forma en que las personas abordan el ejercicio físico, GymBros nació de la idea de unir calidad, flexibilidad y comunidad. Queremos que cada entrenamiento sea una experiencia única que inspire a nuestros alumnos a cuidar su salud y superarse cada día.'
+    /* ── index — números de impacto ─────────────────────── */
+    'index.impact.exercises': { pt: 'Exercícios disponíveis', en: 'Exercises available', es: 'Ejercicios disponibles' },
+    'index.impact.gifs':      { pt: 'GIFs de execução',       en: 'Execution GIFs',      es: 'GIFs de ejecución' },
+    'index.impact.langs':     { pt: 'Idiomas suportados',     en: 'Languages supported', es: 'Idiomas disponibles' },
+    'index.impact.ai':        { pt: 'Treinadora integrada',   en: 'Integrated trainer',  es: 'Entrenadora integrada' },
+
+    /* ── index — IA treinadora ──────────────────────────── */
+    'index.ai.badge':   { pt: '✦ Inteligência Artificial', en: '✦ Artificial Intelligence', es: '✦ Inteligencia Artificial' },
+    'index.ai.title':   { pt: 'Seu personal trainer está no app', en: 'Your personal trainer is in the app', es: 'Tu entrenador personal está en la app' },
+    'index.ai.desc':    {
+        pt: 'A IA do GymBros analisa seu perfil, objetivos e histórico para criar planos de treino e dieta 100% personalizados. Basta conversar.',
+        en: 'GymBros AI analyzes your profile, goals and history to create 100% personalized workout and diet plans. Just chat.',
+        es: 'La IA de GymBros analiza tu perfil, objetivos e historial para crear planes de entrenamiento y dieta 100% personalizados. Solo conversa.'
     },
+    'index.ai.bullet1': { pt: 'Plano de treino gerado em segundos',        en: 'Workout plan generated in seconds',        es: 'Plan de entrenamiento generado en segundos' },
+    'index.ai.bullet2': { pt: 'Dieta adaptada ao seu objetivo',             en: 'Diet adapted to your goal',                es: 'Dieta adaptada a tu objetivo' },
+    'index.ai.bullet3': { pt: 'Avaliação corporal por foto (plano Black)',  en: 'Photo body assessment (Black plan)',        es: 'Evaluación corporal por foto (plan Black)' },
+    'index.ai.btn':     { pt: 'Conhecer planos →', en: 'Explore plans →', es: 'Ver planes →' },
+    'index.ai.photo':   { pt: 'Foto do app — IA', en: 'App screenshot — AI', es: 'Foto de la app — IA' },
+
+    /* ── index — como funciona ──────────────────────────── */
+    'index.how.title':        { pt: 'Do zero ao treino em 3 passos',         en: 'From zero to workout in 3 steps',          es: 'Del cero al entrenamiento en 3 pasos' },
+    'index.how.step1.title':  { pt: 'Crie seu perfil',                        en: 'Create your profile',                      es: 'Crea tu perfil' },
+    'index.how.step1.desc':   { pt: 'Informe seus objetivos, nível de condicionamento e preferências', en: 'Enter your goals, fitness level and preferences', es: 'Ingresa tus objetivos, nivel físico y preferencias' },
+    'index.how.step2.title':  { pt: 'Converse com a IA',                      en: 'Chat with the AI',                         es: 'Conversa con la IA' },
+    'index.how.step2.desc':   { pt: 'Peça seu treino ou dieta. A IA monta tudo personalizado pra você', en: 'Ask for your workout or diet. The AI builds everything personalized for you', es: 'Pide tu entrenamiento o dieta. La IA lo arma todo personalizado para ti' },
+    'index.how.step3.title':  { pt: 'Execute e evolua',                        en: 'Execute and evolve',                       es: 'Ejecuta y evoluciona' },
+    'index.how.step3.desc':   { pt: 'Siga o treino com GIFs, registre suas cargas e acompanhe seu progresso', en: 'Follow the workout with GIFs, log your weights and track your progress', es: 'Sigue el entrenamiento con GIFs, registra tus cargas y monitorea tu progreso' },
+
+    /* ── index — execução de treino ─────────────────────── */
+    'index.exec.badge':   { pt: '✦ Execução guiada', en: '✦ Guided execution', es: '✦ Ejecución guiada' },
+    'index.exec.title':   { pt: 'Treine com GIF, séries e cronômetro', en: 'Train with GIF, sets and timer', es: 'Entrena con GIF, series y cronómetro' },
+    'index.exec.desc':    {
+        pt: 'Cada exercício com GIF demonstrativo, contagem de séries, registro de carga e timer de descanso. Tudo numa tela só.',
+        en: 'Every exercise with a demonstration GIF, set count, weight log and rest timer. All in one screen.',
+        es: 'Cada ejercicio con GIF demostrativo, conteo de series, registro de carga y temporizador de descanso. Todo en una pantalla.'
+    },
+    'index.exec.bullet1': { pt: 'GIF animado para cada exercício',           en: 'Animated GIF for each exercise',           es: 'GIF animado para cada ejercicio' },
+    'index.exec.bullet2': { pt: 'Timer de descanso automático',               en: 'Automatic rest timer',                     es: 'Temporizador de descanso automático' },
+    'index.exec.bullet3': { pt: 'Registro de carga e histórico de evolução', en: 'Weight log and progress history',           es: 'Registro de carga e historial de evolución' },
+    'index.exec.photo':   { pt: 'Foto — Execução de treino', en: 'Screenshot — Workout execution', es: 'Foto — Ejecución de entrenamiento' },
+
+    /* ── sobre (about) ──────────────────────────────────── */
+
+    /* hero editorial */
+    'about.hero.line1': { pt: 'Construído por', en: 'Built by', es: 'Construido por' },
+    'about.hero.line2': { pt: 'quem treina.', en: 'those who train.', es: 'quienes entrenan.' },
+    'about.hero.sub.v2': {
+        pt: 'GymBros é uma plataforma de treino inteligente que usa IA para personalizar cada aspecto da sua evolução física. Sem achismo. Sem plano genérico.',
+        en: 'GymBros is an intelligent training platform that uses AI to personalize every aspect of your physical progress. No guesswork. No generic plan.',
+        es: 'GymBros es una plataforma de entrenamiento inteligente que usa IA para personalizar cada aspecto de tu evolución física. Sin suposiciones. Sin plan genérico.'
+    },
+
+    /* manifesto */
+    'about.history.title': { pt: 'Nossa História', en: 'Our Story', es: 'Nuestra Historia' },
+    'about.manifesto.p1': {
+        pt: 'O GymBros nasceu dentro de uma sala de aula como projeto de conclusão de curso, e cresceu para além disso. Desde o início, a ideia era simples: e se a tecnologia pudesse fazer o que um personal trainer faz, mas acessível para qualquer pessoa?',
+        en: 'GymBros was born inside a classroom as a graduation project, and grew beyond that. From the start, the idea was simple: what if technology could do what a personal trainer does, but accessible to anyone?',
+        es: 'GymBros nació dentro de un aula como proyecto de fin de carrera, y creció más allá de eso. Desde el principio, la idea era simple: ¿y si la tecnología pudiera hacer lo que hace un entrenador personal, pero accesible para cualquier persona?'
+    },
+    'about.manifesto.p2': {
+        pt: 'Hoje, a plataforma combina inteligência artificial, execução guiada com GIFs, notificações inteligentes e histórico de evolução, tudo num app que roda no celular sem precisar instalar nada. O GymBros é um produto real, construído com stack real, para pessoas reais que querem resultado.',
+        en: 'Today, the platform combines artificial intelligence, GIF-guided exercise execution, smart notifications and progress history, all in an app that runs on your phone without installing anything. GymBros is a real product, built with a real stack, for real people who want results.',
+        es: 'Hoy, la plataforma combina inteligencia artificial, ejecución guiada con GIFs, notificaciones inteligentes e historial de evolución, todo en una app que funciona en el celular sin necesidad de instalar nada. GymBros es un producto real, construido con stack real, para personas reales que quieren resultados.'
+    },
+
+    /* números */
+    'about.num.exercises': { pt: 'exercícios catalogados', en: 'catalogued exercises', es: 'ejercicios catalogados' },
+    'about.num.gifs':      { pt: 'GIFs de execução',       en: 'execution GIFs',       es: 'GIFs de ejecución' },
+    'about.num.langs':     { pt: 'idiomas suportados',     en: 'languages supported',  es: 'idiomas disponibles' },
+    'about.num.version':   { pt: 'versão atual',           en: 'current version',      es: 'versión actual' },
+
+    /* stack */
+    'about.stack.label': { pt: 'STACK & TECNOLOGIA', en: 'STACK & TECHNOLOGY', es: 'STACK Y TECNOLOGÍA' },
+    'about.stack.title': {
+        pt: 'Cada decisão técnica foi intencional.',
+        en: 'Every technical decision was intentional.',
+        es: 'Cada decisión técnica fue intencional.'
+    },
+
+    /* trainer */
+    'about.trainer.label': { pt: 'PERSONAL TRAINER PARCEIRO', en: 'PARTNER PERSONAL TRAINER', es: 'PERSONAL TRAINER ASOCIADO' },
+    'about.trainer.role':  { pt: 'Especialista em Performance Física', en: 'Physical Performance Specialist', es: 'Especialista en Rendimiento Físico' },
+    'about.trainer.bio': {
+        pt: 'Mathias é o parceiro de performance física do GymBros. Com experiência em musculação e alto rendimento, ele garante que cada protocolo gerado pela IA esteja alinhado com as melhores práticas do mercado fitness.',
+        en: 'Mathias is GymBros\'s physical performance partner. With experience in bodybuilding and high performance, he ensures every AI-generated protocol aligns with the best practices in the fitness industry.',
+        es: 'Mathias es el socio de rendimiento físico de GymBros. Con experiencia en musculación y alto rendimiento, garantiza que cada protocolo generado por la IA esté alineado con las mejores prácticas del mercado fitness.'
+    },
+
+    /* cta editorial */
+    'about.cta.line1': { pt: 'Pronto para', en: 'Ready to', es: '¿Listo para' },
+    'about.cta.line2': { pt: 'evoluir de verdade?', en: 'evolve for real?', es: 'evolucionar de verdad?' },
+    'about.cta.sub.v2': {
+        pt: 'Crie sua conta e deixa a IA montar seu primeiro treino agora.',
+        en: 'Create your account and let the AI build your first workout now.',
+        es: 'Crea tu cuenta y deja que la IA arme tu primer entrenamiento ahora.'
+    },
+    'about.history.desc': {
+        pt: 'Fundada com o objetivo de transformar a forma como as pessoas encaram o exercício físico, a GymBros nasceu da ideia de unir tecnologia, inteligência artificial e motivação. Queremos que cada treino seja uma experiência única e personalizada, que inspire nossos usuários a cuidar da saúde e se superar todos os dias.',
+        en: 'Founded with the goal of transforming how people approach physical exercise, GymBros was born from the idea of uniting technology, artificial intelligence and motivation. We want every workout to be a unique, personalized experience that inspires our users to take care of their health and surpass themselves every day.',
+        es: 'Fundada con el objetivo de transformar la forma en que las personas abordan el ejercicio físico, GymBros nació de la idea de unir tecnología, inteligencia artificial y motivación. Queremos que cada entrenamiento sea una experiencia única y personalizada que inspire a nuestros usuarios a cuidar su salud y superarse cada día.'
+    },
+
+    /* ── about — hero ───────────────────────────────────── */
+    'about.hero.title': {
+        pt: 'Construído para quem leva o treino a sério',
+        en: 'Built for those who take training seriously',
+        es: 'Construido para quienes toman el entrenamiento en serio'
+    },
+    'about.hero.desc': {
+        pt: 'O GymBros nasceu da ideia de que tecnologia e saúde deveriam andar juntas. Somos uma plataforma de treino inteligente que usa IA para personalizar cada aspecto da sua jornada fitness.',
+        en: 'GymBros was born from the idea that technology and health should go hand in hand. We are a smart training platform that uses AI to personalize every aspect of your fitness journey.',
+        es: 'GymBros nació de la idea de que la tecnología y la salud deberían ir de la mano. Somos una plataforma de entrenamiento inteligente que usa IA para personalizar cada aspecto de tu jornada fitness.'
+    },
+
     'about.mission.title': { pt: 'Missão',  en: 'Mission', es: 'Misión' },
     'about.mission.desc': {
-        pt: 'Proporcionar aos nossos alunos acesso a academias de qualidade, promovendo saúde, bem-estar e motivação contínua.',
-        en: 'Provide our members with access to quality gyms, promoting health, well-being and continuous motivation.',
-        es: 'Proporcionar a nuestros alumnos acceso a gimnasios de calidad, promoviendo la salud, el bienestar y la motivación continua.'
+        pt: 'Proporcionar a cada usuário uma experiência de treino inteligente e personalizada, combinando tecnologia, IA e motivação para transformar a saúde e o bem-estar no dia a dia.',
+        en: 'Provide each user with an intelligent, personalized training experience, combining technology, AI and motivation to transform health and well-being every day.',
+        es: 'Proporcionar a cada usuario una experiencia de entrenamiento inteligente y personalizada, combinando tecnología, IA y motivación para transformar la salud y el bienestar cotidiano.'
     },
     'about.vision.title': { pt: 'Visão', en: 'Vision', es: 'Visión' },
     'about.vision.desc': {
-        pt: 'Ser referência em academias flexíveis e inovadoras, conectando pessoas e fortalecendo uma comunidade saudável.',
-        en: 'To be a reference in flexible and innovative gyms, connecting people and strengthening a healthy community.',
-        es: 'Ser referencia en gimnasios flexibles e innovadores, conectando personas y fortaleciendo una comunidad saludable.'
+        pt: 'Ser a plataforma de referência em treino assistido por IA no Brasil, tornando o acompanhamento profissional acessível para qualquer pessoa, em qualquer lugar.',
+        en: 'To be the leading AI-assisted training platform in Brazil, making professional coaching accessible to anyone, anywhere.',
+        es: 'Ser la plataforma de referencia en entrenamiento asistido por IA en Brasil, haciendo que el acompañamiento profesional sea accesible para cualquier persona, en cualquier lugar.'
     },
     'about.values.title': { pt: 'Valores', en: 'Values', es: 'Valores' },
     'about.values.desc': {
@@ -119,14 +242,61 @@ const dictionary = {
         en: 'Commitment, Flexibility, Innovation, Respect and Passion for physical exercise.',
         es: 'Compromiso, Flexibilidad, Innovación, Respeto y Pasión por el ejercicio físico.'
     },
-    'about.team.title': { pt: 'Conheça nossa equipe', en: 'Meet our team', es: 'Conoce a nuestro equipo' },
-    'about.cta.title':  { pt: 'Venha treinar com a gente!', en: 'Come train with us!', es: '¡Ven a entrenar con nosotros!' },
-    'about.cta.desc': {
-        pt: 'Descubra como é fácil manter a disciplina e a motivação quando você tem suporte, comunidade e flexibilidade.',
-        en: 'Discover how easy it is to maintain discipline and motivation when you have support, community and flexibility.',
-        es: 'Descubre lo fácil que es mantener la disciplina y la motivación cuando tienes apoyo, comunidad y flexibilidad.'
+    'about.team.title': { pt: 'Quem está por trás do GymBros', en: 'Who is behind GymBros', es: 'Quiénes están detrás de GymBros' },
+
+    /* ── about — tecnologia ─────────────────────────────── */
+    'about.tech.title':    { pt: 'Tecnologia de ponta, resultado real', en: 'Cutting-edge technology, real results', es: 'Tecnología de punta, resultados reales' },
+    'about.tech.subtitle': {
+        pt: 'Cada feature do GymBros foi construída com as melhores ferramentas disponíveis',
+        en: 'Every GymBros feature was built with the best tools available',
+        es: 'Cada feature de GymBros fue construida con las mejores herramientas disponibles'
     },
-    'about.cta.btn': { pt: 'VEJA NOSSOS PLANOS', en: 'SEE OUR PLANS', es: 'VER NUESTROS PLANES' },
+    'about.tech.groq.name':       { pt: 'Groq AI',     en: 'Groq AI',     es: 'Groq AI' },
+    'about.tech.groq.desc':       { pt: 'IA ultra-rápida para geração de treinos e dietas',    en: 'Ultra-fast AI for workout and diet generation',       es: 'IA ultra-rápida para generación de entrenamientos y dietas' },
+    'about.tech.cloudinary.name': { pt: 'Cloudinary',  en: 'Cloudinary',  es: 'Cloudinary' },
+    'about.tech.cloudinary.desc': { pt: '235+ GIFs de exercícios otimizados',                  en: '235+ optimized exercise GIFs',                        es: '235+ GIFs de ejercicios optimizados' },
+    'about.tech.push.name':       { pt: 'Web Push',    en: 'Web Push',    es: 'Web Push' },
+    'about.tech.push.desc':       { pt: 'Notificações de treino, água e sono',                  en: 'Workout, water and sleep notifications',               es: 'Notificaciones de entrenamiento, agua y sueño' },
+    'about.tech.pwa.name':        { pt: 'PWA',         en: 'PWA',         es: 'PWA' },
+    'about.tech.pwa.desc':        { pt: 'Instale no celular, funciona offline',                  en: 'Install on mobile, works offline',                    es: 'Instala en el celular, funciona sin conexión' },
+    'about.tech.mysql.name':      { pt: 'MySQL',       en: 'MySQL',       es: 'MySQL' },
+    'about.tech.mysql.desc':      { pt: 'Histórico e evolução salvos com segurança',             en: 'History and progress saved securely',                 es: 'Historial y evolución guardados con seguridad' },
+    'about.tech.i18n.name':       { pt: 'i18n',        en: 'i18n',        es: 'i18n' },
+    'about.tech.i18n.desc':       { pt: 'Disponível em português, inglês e espanhol',            en: 'Available in Portuguese, English and Spanish',        es: 'Disponible en portugués, inglés y español' },
+
+    /* ── about — equipe ─────────────────────────────────── */
+    'about.team.mathias.role': { pt: 'Personal Trainer Certificado ✦ Parceiro Oficial', en: 'Certified Personal Trainer ✦ Official Partner', es: 'Personal Trainer Certificado ✦ Socio Oficial' },
+    'about.team.mathias.bio':  {
+        pt: 'Mathias é o especialista em performance física do GymBros. Com anos de experiência em musculação e alto rendimento, ele garante que cada treino gerado pela IA esteja alinhado com as melhores práticas do mercado fitness.',
+        en: 'Mathias is GymBros\'s physical performance specialist. With years of experience in bodybuilding and high performance, he ensures every AI-generated workout aligns with the best practices in the fitness industry.',
+        es: 'Mathias es el especialista en rendimiento físico de GymBros. Con años de experiencia en musculación y alto rendimiento, garantiza que cada entrenamiento generado por la IA esté alineado con las mejores prácticas del mercado fitness.'
+    },
+    'about.team.mathias.note': {
+        pt: '* Mathias está em retiro espiritual e não atende mensagens no momento',
+        en: '* Mathias is on a spiritual retreat and is not available for messages at this time',
+        es: '* Mathias está en retiro espiritual y no atiende mensajes en este momento'
+    },
+    'about.team.davi.role': { pt: 'Fundador & Desenvolvedor Full Stack', en: 'Founder & Full Stack Developer', es: 'Fundador y Desarrollador Full Stack' },
+    'about.team.davi.bio':  {
+        pt: 'Responsável por toda a arquitetura, frontend, backend e identidade visual do GymBros. Desenvolveu a plataforma do zero com Node.js, IA e muito café.',
+        en: 'Responsible for GymBros\'s full architecture, frontend, backend and visual identity. Built the platform from scratch with Node.js, AI and a lot of coffee.',
+        es: 'Responsable de toda la arquitectura, frontend, backend e identidad visual de GymBros. Desarrolló la plataforma desde cero con Node.js, IA y mucho café.'
+    },
+    'about.team.felippe.role': { pt: 'Co-fundador & Estratégia de Crescimento', en: 'Co-founder & Growth Strategy', es: 'Cofundador y Estrategia de Crecimiento' },
+    'about.team.felippe.bio':  {
+        pt: 'Responsável pela estratégia de tráfego pago e crescimento da plataforma.',
+        en: 'Responsible for paid traffic strategy and platform growth.',
+        es: 'Responsable de la estrategia de tráfico pago y el crecimiento de la plataforma.'
+    },
+
+    /* ── about — cta ────────────────────────────────────── */
+    'about.cta.title': { pt: 'Pronto para treinar de verdade?', en: 'Ready to train for real?', es: '¿Listo para entrenar de verdad?' },
+    'about.cta.desc':  {
+        pt: 'Crie sua conta grátis e deixa a IA montar seu primeiro treino agora.',
+        en: 'Create your free account and let the AI build your first workout now.',
+        es: 'Crea tu cuenta gratis y deja que la IA arme tu primer entrenamiento ahora.'
+    },
+    'about.cta.btn': { pt: 'Começar agora →', en: 'Get started →', es: 'Empezar ahora →' },
 
     /* ── planos ─────────────────────────────────────────── */
     'plans.hero.title': {
@@ -144,17 +314,21 @@ const dictionary = {
         en: 'You don\'t have an active plan yet. Choose a plan to access the member area.',
         es: 'Aún no tienes un plan activo. Elige un plan para acceder al área del alumno.'
     },
-    'plans.starter.f1': { pt: '2300+ Academias e estúdios',     en: '2300+ Gyms and studios',   es: '2300+ Gimnasios y estudios' },
-    'plans.starter.f2': { pt: 'Treinos online e presenciais',    en: 'Online and in-person workouts', es: 'Entrenamientos online y presenciales' },
-    'plans.gymbro.f1':  { pt: '3560+ Academias e estúdios',     en: '3560+ Gyms and studios',   es: '3560+ Gimnasios y estudios' },
-    'plans.gymbro.f2':  { pt: 'Treinos online ao vivo',          en: 'Live online workouts',     es: 'Entrenamientos online en vivo' },
-    'plans.gymbro.f3':  { pt: 'Leve 4 amigos por mês',          en: 'Bring 4 friends per month', es: 'Lleva 4 amigos por mes' },
-    'plans.gymbro.f4':  { pt: 'Personal trainer online',        en: 'Online personal trainer',  es: 'Entrenador personal online' },
-    'plans.black.f1':   { pt: 'Acesso ilimitado em academias parceiras', en: 'Unlimited access at partner gyms', es: 'Acceso ilimitado en gimnasios asociados' },
-    'plans.black.f2':   { pt: '+5000 Academias e estúdios',     en: '+5000 Gyms and studios',   es: '+5000 Gimnasios y estudios' },
-    'plans.black.f3':   { pt: 'Treinos online e presenciais',   en: 'Online and in-person workouts', es: 'Entrenamientos online y presenciales' },
-    'plans.black.f4':   { pt: 'Aulas exclusivas e personal trainer', en: 'Exclusive classes and personal trainer', es: 'Clases exclusivas y entrenador personal' },
-    'plans.black.f5':   { pt: 'Área VIP e benefícios premium',  en: 'VIP area and premium benefits', es: 'Área VIP y beneficios premium' },
+    'plans.starter.f1': { pt: 'Treinos manuais ilimitados',       en: 'Unlimited manual workouts',     es: 'Entrenamientos manuales ilimitados' },
+    'plans.starter.f2': { pt: 'Execução de treino com GIFs',     en: 'Workout execution with GIFs',   es: 'Ejecución de entrenamiento con GIFs' },
+    'plans.starter.f3': { pt: 'Check-in manual de treino',       en: 'Manual workout check-in',       es: 'Check-in manual de entrenamiento' },
+    'plans.starter.f4': { pt: 'Streak de treinos',               en: 'Workout streak',                es: 'Racha de entrenamientos' },
+    'plans.starter.f5': { pt: 'Notificações de água e sono',     en: 'Water and sleep notifications', es: 'Notificaciones de agua y sueño' },
+    'plans.gymbro.f1':  { pt: 'Tudo do Starter',                 en: 'Everything in Starter',         es: 'Todo lo del Starter' },
+    'plans.gymbro.f2':  { pt: 'IA treinadora personalizada',     en: 'Personalized AI trainer',       es: 'IA entrenadora personalizada' },
+    'plans.gymbro.f3':  { pt: 'Plano de treino gerado por IA',   en: 'AI-generated workout plan',     es: 'Plan de entrenamiento generado por IA' },
+    'plans.gymbro.f4':  { pt: 'Plano de dieta gerado por IA',    en: 'AI-generated diet plan',        es: 'Plan de dieta generado por IA' },
+    'plans.gymbro.f5':  { pt: 'Histórico completo de conversas IA', en: 'Full AI conversation history', es: 'Historial completo de conversaciones IA' },
+    'plans.black.f1':   { pt: 'Tudo do GymBro',                  en: 'Everything in GymBro',          es: 'Todo lo del GymBro' },
+    'plans.black.f2':   { pt: 'Avaliação corporal por foto (IA Vision)', en: 'Photo body assessment (AI Vision)', es: 'Evaluación corporal por foto (IA Vision)' },
+    'plans.black.f3':   { pt: 'Personal trainer IA exclusivo',   en: 'Exclusive AI personal trainer', es: 'Personal trainer IA exclusivo' },
+    'plans.black.f4':   { pt: 'Análise avançada de evolução corporal', en: 'Advanced body progress analysis', es: 'Análisis avanzado de evolución corporal' },
+    'plans.black.f5':   { pt: 'Suporte prioritário',             en: 'Priority support',              es: 'Soporte prioritario' },
     'plans.btn.subscribe': { pt: 'Assinar agora', en: 'Subscribe now', es: 'Suscribirse ahora' },
     'plans.price.month':   { pt: '/mês',          en: '/month',        es: '/mes' }
 };

@@ -19,7 +19,7 @@
             <h1 class="admin-page-title">Check-ins</h1>
             <p class="admin-page-subtitle"><%= total %> registros | <strong class="text-gold"><%= checkinsHoje %></strong> check-ins hoje</p>
 
-            <!-- Chart + Filtro -->
+            <!-- Chart -->
             <section class="admin-charts-grid" style="margin-bottom:20px">
                 <section class="admin-card">
                     <section class="admin-card-header">
@@ -29,26 +29,6 @@
                         <section class="chart-wrap"><canvas id="chartCheckins"></canvas></section>
                     </section>
                 </section>
-                <section class="admin-card">
-                    <section class="admin-card-header"><span class="admin-card-title">Filtrar</span></section>
-                    <section class="admin-card-body">
-                        <form method="GET" action="/admin/checkins">
-                            <section class="admin-form-group">
-                                <label>Academia</label>
-                                <select name="academia" class="admin-input">
-                                    <option value="">Todas</option>
-                                    <% academias.forEach(a => { %>
-                                    <option value="<%= a.id %>" <%= academia===a.id?'selected':'' %>><%= a.nome %></option>
-                                    <% }) %>
-                                </select>
-                            </section>
-                            <button type="submit" class="btn btn-gold w-100" style="justify-content:center"><i class="fas fa-filter"></i> Filtrar</button>
-                            <% if (academia) { %>
-                            <a href="/admin/checkins" class="btn btn-outline w-100 mt-8" style="justify-content:center;margin-top:8px">Limpar</a>
-                            <% } %>
-                        </form>
-                    </section>
-                </section>
             </section>
 
             <!-- Tabela -->
@@ -56,12 +36,11 @@
                 <section class="admin-card-body no-pad">
                     <section class="admin-table-wrap">
                         <table class="admin-table">
-                            <thead><tr><th>Usuário</th><th>Academia</th><th>Data</th><th>Hora</th></tr></thead>
+                            <thead><tr><th>Usuário</th><th>Data</th><th>Hora</th></tr></thead>
                             <tbody>
                             <% items.forEach(c => { %>
                             <tr>
                                 <td class="fw-600"><%= c.userName %></td>
-                                <td class="text-muted"><%= c.academiaNome %></td>
                                 <td class="text-muted"><%= c.dataStr %></td>
                                 <td><span class="badge badge-muted"><%= c.hora %></span></td>
                             </tr>
@@ -75,7 +54,7 @@
             <% if (pages > 1) { %>
             <section class="admin-pagination">
                 <% for (let i = 1; i <= pages; i++) { %>
-                <a href="/admin/checkins?academia=<%= academia %>&page=<%= i %>" class="<%= i===currentPage?'active':'' %>"><%= i %></a>
+                <a href="/admin/checkins?page=<%= i %>" class="<%= i===currentPage?'active':'' %>"><%= i %></a>
                 <% } %>
             </section>
             <% } %>

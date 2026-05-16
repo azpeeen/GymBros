@@ -1008,15 +1008,15 @@ INSERT INTO admin_user (nome, email, senha_hash, role) VALUES
 INSERT INTO plan (slug, nome, descricao, preco, duracao_dias, beneficios, permite_ia, permite_avaliacao_corporal, ordem) VALUES
   ('starter', 'Starter', 'Acesso básico à plataforma',
    64.90, 30,
-   JSON_ARRAY('2300+ academias e estúdios','Treinos online e presenciais','App GymBros','Suporte 24h'),
+   JSON_ARRAY('Treinos manuais ilimitados','Execução de treino com GIFs','Check-in manual de treino','Streak de treinos','Notificações de água e sono'),
    0, 0, 1),
   ('gymbro', 'GymBro', 'Plano intermediário com IA treinadora',
    85.60, 30,
-   JSON_ARRAY('3560+ academias e estúdios','Treinos online ao vivo','Leve 4 amigos por mês','Personal trainer IA'),
+   JSON_ARRAY('Tudo do Starter','IA treinadora personalizada','Plano de treino gerado por IA','Plano de dieta gerado por IA','Histórico completo de conversas IA'),
    1, 0, 2),
   ('black', 'Black', 'Plano completo com avaliação corporal por IA',
    145.90, 30,
-   JSON_ARRAY('5000+ academias e estúdios','Treinos online ao vivo','Leve amigos ilimitado','Personal trainer exclusivo','Avaliação corporal IA','Área VIP'),
+   JSON_ARRAY('Tudo do GymBro','Avaliação corporal por foto (IA Vision)','Personal trainer IA exclusivo','Análise avançada de evolução corporal','Suporte prioritário'),
    1, 1, 3);
 
 

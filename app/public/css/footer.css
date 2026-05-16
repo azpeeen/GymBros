@@ -31,6 +31,13 @@ footer {
     margin-bottom: 5px;
 }
 
+.footermidia p,
+.footermidia li,
+.footermidia a {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
 .footermidia a {
     color: #fff;
     text-decoration: none;
@@ -62,4 +69,5 @@ footer {
 
 .footercopy p {
     margin: 0;
+    font-size: 13px;
 }

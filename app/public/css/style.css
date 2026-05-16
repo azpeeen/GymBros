@@ -5,7 +5,7 @@
 }
 
 html {
-    font-size: 62.5%; 
+    font-size: 62.5%;
 }
 
 body {
@@ -337,5 +337,441 @@ a {
     .corner-right {
         transform: translate(50%, -50%);
     }
+}
+
+/* ── Categorias de Treino ───────────────────────────────── */
+.categorias-treino {
+    background-color: #DDB872;
+    margin-top: 6rem;
+    margin-bottom: 100px;
+    padding: 4rem 0 3rem;
+    text-align: center;
+    overflow: hidden;
+}
+
+.categorias-treino h2 {
+    font-size: 2.8rem;
+    color: #000;
+    padding-left: 0;
+    margin-top: 0;
+    margin-bottom: 0.6rem;
+}
+
+.categorias-subtitle {
+    font-size: 1.6rem;
+    color: rgba(0, 0, 0, 0.65);
+    margin-bottom: 2.4rem;
+}
+
+.categories-outer {
+    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+}
+
+.categories-track {
+    display: flex;
+    flex-wrap: nowrap;
+    width: max-content;
+    padding: 8px 0;
+    will-change: transform;
+}
+
+.category-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px 24px;
+    min-width: 110px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+    margin-right: 16px;
+}
+
+.category-item svg {
+    width: 32px;
+    height: 32px;
+    color: #B8860B;
+    stroke: #B8860B;
+}
+
+.category-item span {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #222;
+    white-space: nowrap;
+}
+
+/* ── CSS Variables ─────────────────────────────────────── */
+:root {
+    --primary: #B8860B;
+    --primary-light: #FFD700;
+    --bg: #ffffff;
+    --card-bg: #faf7f0;
+    --text: #1a1a1a;
+    --text-secondary: #666666;
+}
+
+/* ── Lightbox ───────────────────────────────────────────── */
+.zoomable-img {
+    cursor: zoom-in;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.zoomable-img:hover {
+    transform: scale(1.03);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+.img-lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.88);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-out;
+}
+
+.img-lightbox.open {
+    display: flex;
+    animation: lbFadeIn 0.18s ease;
+}
+
+@keyframes lbFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.lightbox-inner {
+    max-width: 92vw;
+    max-height: 92vh;
+    cursor: default;
+    display: flex;
+}
+
+.lightbox-inner img {
+    max-width: 92vw;
+    max-height: 92vh;
+    border-radius: 12px;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6);
+    animation: lbZoom 0.22s ease;
+}
+
+@keyframes lbZoom {
+    from { transform: scale(0.88); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+}
+
+.lightbox-close {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    color: #fff;
+    font-size: 28px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    line-height: 1;
+}
+
+.lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+/* ── Animate In ─────────────────────────────────────────── */
+.animate-in {
+    opacity: 0;
+    transform: translateY(32px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.animate-in.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ── Section Badge ──────────────────────────────────────── */
+.section-badge {
+    display: inline-block;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: 0.04em;
+    margin-bottom: 0.8rem;
+}
+
+/* ── Impact Numbers ─────────────────────────────────────── */
+.impact-numbers {
+    padding: 80px 5%;
+    background: var(--bg);
+}
+
+.impact-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2.4rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.impact-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    background: var(--card-bg);
+    border: 1px solid rgba(184,134,11,0.2);
+    border-radius: 16px;
+    padding: 3.2rem 2rem;
+    text-align: center;
+}
+
+.impact-number {
+    font-size: 5.6rem;
+    font-weight: 900;
+    color: var(--primary);
+    line-height: 1;
+    font-family: 'Arial', sans-serif;
+}
+
+.impact-text {
+    font-size: 5.6rem;
+}
+
+.impact-label {
+    font-size: 1.4rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+/* ── Split Sections ─────────────────────────────────────── */
+.split-section {
+    display: flex;
+    align-items: center;
+    gap: 6rem;
+}
+
+.ai-section {
+    background: var(--card-bg);
+    padding: 80px 10%;
+}
+
+.execution-section {
+    background: var(--bg);
+    padding: 80px 10%;
+}
+
+.split-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+}
+
+.split-text h2 {
+    font-size: 3.6rem;
+    color: var(--text);
+    padding-left: 0;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.split-text p {
+    font-size: 1.8rem;
+    color: #444;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.split-image {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* ── Photo Placeholder ──────────────────────────────────── */
+.photo-placeholder {
+    width: fit-content;
+    max-width: 100%;
+    padding: 5px;
+    background: linear-gradient(135deg, #DDB872 0%, #B8860B 60%, #8B6914 100%);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 20px 60px rgba(184,134,11,0.25);
+}
+
+.photo-placeholder img {
+    max-width: 100%;
+    height: auto;
+}
+
+.photo-slot {
+    position: relative;
+}
+
+.zoom-hint {
+    position: absolute;
+    bottom: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    background: rgba(0, 0, 0, 0.52);
+    backdrop-filter: blur(6px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    opacity: 0.75;
+    transition: opacity 0.2s, transform 0.15s;
+    pointer-events: none;
+}
+
+.photo-slot:hover .zoom-hint {
+    opacity: 1;
+    transform: scale(1.12);
+}
+
+.photo-placeholder svg {
+    stroke: rgba(255,255,255,0.85);
+    width: 48px;
+    height: 48px;
+}
+
+.photo-placeholder > span {
+    font-size: 1.4rem;
+    color: rgba(255,255,255,0.8);
+    font-weight: 500;
+}
+
+.phone-mockup {
+    max-width: 280px;
+    aspect-ratio: 9/16;
+    border-radius: 32px;
+    box-shadow: 0 30px 80px rgba(184,134,11,0.3);
+}
+
+/* ── Feature Bullets ────────────────────────────────────── */
+.feature-bullets {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.feature-bullets li {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    font-size: 1.6rem;
+    color: #333;
+}
+
+.check-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    min-width: 2.4rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #B8860B, #FFD700);
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 900;
+}
+
+/* ── How It Works ───────────────────────────────────────── */
+.how-it-works {
+    padding: 80px 5%;
+    background: var(--bg);
+    text-align: center;
+}
+
+.how-it-works > h2 {
+    font-size: 3.6rem;
+    color: var(--text);
+    padding-left: 0;
+    margin: 0 0 4.8rem 0;
+}
+
+.steps-grid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2.4rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.step-card {
+    flex: 1;
+    max-width: 300px;
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 3.2rem 2.4rem;
+    text-align: center;
+    position: relative;
+    border: 1px solid rgba(184,134,11,0.15);
+}
+
+.step-number {
+    position: absolute;
+    top: 1.6rem;
+    right: 2rem;
+    font-size: 4rem;
+    font-weight: 900;
+    color: var(--primary);
+    opacity: 0.15;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.step-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 6.4rem;
+    height: 6.4rem;
+    border-radius: 50%;
+    background: rgba(184,134,11,0.1);
+    margin-bottom: 1.6rem;
+}
+
+.step-icon svg {
+    stroke: var(--primary);
+}
+
+.step-card h3 {
+    font-size: 2rem;
+    color: var(--text);
+    margin-bottom: 0.8rem;
+}
+
+.step-card p {
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.step-connector {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
 }
 
