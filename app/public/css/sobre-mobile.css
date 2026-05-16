@@ -1,93 +1,168 @@
-/* sobre-mobile.css */
+/* sobre-mobile.css — design editorial v2 */
 
-/* Reset específico para mobile */
+html {
+    font-size: 56.25% !important;
+}
+
 body {
-    font-size: 16px;
+    overflow-x: hidden !important;
 }
 
-/* Banner principal */
-.banner-home img {
-    height: auto;
+/* ── Hero ─────────────────────────────────────────────────── */
+.about-hero-ed {
+    flex-direction: column !important;
+    padding: 8rem 5% 6rem !important;
+    gap: 4rem !important;
 }
 
-/* História */
-.sobre-historia {
-    margin: 40px 15px;
+.hero-content {
+    flex: none !important;
+    width: 100% !important;
 }
 
-.sobre-historia h1 {
-    font-size: 1.8rem;
+.hero-visual {
+    width: 100% !important;
+    justify-content: center !important;
 }
 
-.sobre-historia p {
-    font-size: 0.95rem;
-    line-height: 1.5;
+.hero-title {
+    font-size: 4rem !important;
 }
 
-/* Missão, Visão e Valores */
-.sobre-missao-valores {
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    margin: 40px 15px;
+.hero-sub {
+    font-size: 1.7rem !important;
+    max-width: 100% !important;
 }
 
-.sobre-box {
-    padding: 20px;
+/* ── Manifesto ────────────────────────────────────────────── */
+.about-manifesto {
+    padding: 6.4rem 5% !important;
 }
 
-/* Equipe */
-.sobre-equipe {
-    margin: 40px 15px;
+.manifesto-inner {
+    flex-direction: column !important;
 }
 
-.sobre-equipe h2 {
-    font-size: 1.8rem;
-    margin-bottom: 30px;
+.manifesto-left {
+    flex: none !important;
+    padding-right: 0 !important;
+    padding-bottom: 2.4rem !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--primary) !important;
 }
 
-/* Modalidades/Equipe */
-.img-modalidades {
-    flex-direction: column;
-    gap: 30px;
+.manifesto-right {
+    padding-left: 0 !important;
+    padding-top: 2.4rem !important;
 }
 
-.modalidade img {
-    width: 120px;
-    height: 120px;
+.manifesto-right p {
+    font-size: 1.7rem !important;
 }
 
-.modalidade span {
-    font-size: 1rem;
+/* ── Números ──────────────────────────────────────────────── */
+.about-numbers {
+    padding: 6.4rem 5% !important;
 }
 
-/* Call-to-action */
-.planos {
-    padding: 50px 15px;
-    border-radius: 15px;
+.numbers-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 4rem 0 !important;
+    max-width: 100% !important;
 }
 
-.planos h2 {
-    font-size: 1.8rem;
+.num-sep {
+    display: none !important;
 }
 
-.planos p {
-    font-size: 1rem;
-    margin-bottom: 20px;
+.num-item {
+    padding: 0 !important;
 }
 
-.btn-veja-mais {
-    padding: 12px 25px;
-    font-size: 0.95rem;
+.numbers-row .num-item:last-child {
+    grid-column: 1 / -1 !important;
+    text-align: center !important;
 }
 
-/* Cantos decorativos */
-.corner-left, 
-.corner-right {
-    display: none !important; 
+.num-value {
+    font-size: 4rem !important;
 }
 
-/* Ajuste geral de margens */
-main section {
-    margin-bottom: 30px;
+.num-label {
+    font-size: 1.2rem !important;
+}
+
+/* ── Stack ────────────────────────────────────────────────── */
+.about-stack {
+    padding: 6.4rem 5% !important;
+}
+
+.stack-title {
+    font-size: 2.8rem !important;
+    margin-bottom: 3.2rem !important;
+}
+
+.stack-item {
+    flex-direction: column !important;
+    gap: 0.4rem !important;
+}
+
+.stack-name {
+    min-width: auto !important;
+}
+
+.stack-sep {
+    display: none !important;
+}
+
+.stack-desc {
+    font-size: 1.5rem !important;
+}
+
+/* ── Trainer ──────────────────────────────────────────────── */
+.about-trainer {
+    flex-direction: column !important;
+    min-height: auto !important;
+}
+
+.trainer-image {
+    flex: none !important;
+    height: 300px !important;
+}
+
+.trainer-image img {
+    height: 300px !important;
+    object-position: top !important;
+}
+
+.trainer-info {
+    flex: none !important;
+    padding: 4rem 5% !important;
+}
+
+.trainer-name {
+    font-size: 3.6rem !important;
+}
+
+.trainer-bio {
+    max-width: 100% !important;
+}
+
+/* ── CTA ──────────────────────────────────────────────────── */
+.about-cta-ed {
+    padding: 8rem 5% !important;
+}
+
+.cta-title {
+    font-size: 3.6rem !important;
+}
+
+.cta-sub {
+    font-size: 1.6rem !important;
+}
+
+.btn-cta-solid {
+    font-size: 1.5rem !important;
+    padding: 14px 32px !important;
 }

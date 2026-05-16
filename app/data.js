@@ -48,9 +48,9 @@ function seedAcademias() {
 // ── SEED Planos ───────────────────────────────────────────────────────────────
 function seedPlanos() {
     planos.push(
-        { id: 'pl001', nome: 'Starter', descricao: 'Para quem está começando na vida fitness.',  preco: 64.90,  duracao: 'mensal', beneficios: ['2300+ academias e estúdios', 'Treinos online e presenciais', 'App GymBros', 'Suporte 24h'],                                                               status: 'ativo', createdAt: daysAgo(365) },
-        { id: 'pl002', nome: 'GymBro',  descricao: 'O plano mais popular do GymBros.',           preco: 85.60,  duracao: 'mensal', beneficios: ['3560+ academias e estúdios', 'Treinos online ao vivo', 'Leve 4 amigos por mês', 'Personal trainer online', 'Acesso a estúdios premium'],                status: 'ativo', createdAt: daysAgo(365) },
-        { id: 'pl003', nome: 'Black',   descricao: 'Acesso total, sem limites.',                  preco: 145.90, duracao: 'mensal', beneficios: ['5000+ academias e estúdios', 'Treinos online ao vivo', 'Leve amigos ilimitado', 'Personal trainer exclusivo', 'Área VIP', 'Benefícios premium'], status: 'ativo', createdAt: daysAgo(365) }
+        { id: 'pl001', nome: 'Starter', descricao: 'Para quem está começando na vida fitness.',  preco: 64.90,  duracao: 'mensal', beneficios: ['Treinos manuais ilimitados', 'Execução de treino com GIFs', 'Check-in manual de treino', 'Streak de treinos', 'Notificações de água e sono'],                          status: 'ativo', createdAt: daysAgo(365) },
+        { id: 'pl002', nome: 'GymBro',  descricao: 'O plano mais popular do GymBros.',           preco: 85.60,  duracao: 'mensal', beneficios: ['Tudo do Starter', 'IA treinadora personalizada', 'Plano de treino gerado por IA', 'Plano de dieta gerado por IA', 'Histórico completo de conversas IA'],                                          status: 'ativo', createdAt: daysAgo(365) },
+        { id: 'pl003', nome: 'Black',   descricao: 'Acesso total, sem limites.',                  preco: 145.90, duracao: 'mensal', beneficios: ['Tudo do GymBro', 'Avaliação corporal por foto (IA Vision)', 'Personal trainer IA exclusivo', 'Análise avançada de evolução corporal', 'Suporte prioritário'],                                    status: 'ativo', createdAt: daysAgo(365) }
     );
 }
 
@@ -170,7 +170,7 @@ function seedTickets() {
     const assuntos = [
         { assunto: 'Problema ao fazer check-in',             tipo: 'Problema no app' },
         { assunto: 'Dúvida sobre cobrança do plano',         tipo: 'Dúvida sobre plano' },
-        { assunto: 'Academia parceira fechada',               tipo: 'Problema na academia' },
+        { assunto: 'Treino não carregando corretamente',      tipo: 'Problema no app' },
         { assunto: 'Erro no Personal Trainer IA',            tipo: 'Problema no app' },
         { assunto: 'Como cancelar meu plano?',               tipo: 'Dúvida sobre plano' },
         { assunto: 'App travando na avaliação corporal',     tipo: 'Problema no app' },

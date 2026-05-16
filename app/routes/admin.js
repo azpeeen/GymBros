@@ -192,24 +192,8 @@ router.get('/usuarios/:id', async (req, res) => {
     }
 });
 
-// ── ACADEMIAS ─────────────────────────────────────────────────────────────────
-router.get('/academias', async (req, res) => {
-    try {
-        const [academias, ticketCount] = await Promise.all([
-            Gym.findAll(),
-            SupportTicket.countOpen(),
-        ]);
-        const adminConfig = buildAdminConfig(res.locals.config);
-        res.render('pages/admin-academias', {
-            ticketCount, adminConfig,
-            title: 'Academias', page: 'academias', admin: req.session.admin,
-            academias,
-        });
-    } catch (err) {
-        console.error('[admin/academias]', err);
-        res.status(500).send('Erro ao carregar academias.');
-    }
-});
+// ── ACADEMIAS (descontinuado) ─────────────────────────────────────────────────
+router.get('/academias', (req, res) => res.redirect(302, '/admin/dashboard'));
 
 // ── PLANOS ───────────────────────────────────────────────────────────────────
 router.get('/planos', async (req, res) => {
@@ -232,25 +216,21 @@ router.get('/planos', async (req, res) => {
 
 // ── CHECK-INS ────────────────────────────────────────────────────────────────
 router.get('/checkins', async (req, res) => {
-    const { academia = '' } = req.query;
     const perPage = 20;
     const pagina  = Math.floor(Number(req.query.page)) || 1;
     const offset  = (pagina - 1) * perPage;
     try {
-        const params = [];
-        let where = 'WHERE 1=1';
-        if (academia) { where += ' AND c.gym_id = ?'; params.push(academia); }
-
-        const [[{ total }]]   = await db.execute(`SELECT COUNT(*) AS total FROM checkin c ${where}`, params);
+        const [[{ total }]]        = await db.execute('SELECT COUNT(*) AS total FROM checkin c');
         const [[{ checkinsHoje }]] = await db.execute("SELECT COUNT(*) AS checkinsHoje FROM checkin WHERE DATE(data) = CURDATE()");
 
         const [items] = await db.execute(
-            `SELECT c.*, u.nome AS userName, g.nome AS academiaNome
+            `SELECT c.*,
+                    u.nome AS userName,
+                    DATE_FORMAT(c.data, '%d/%m/%Y') AS dataStr,
+                    DATE_FORMAT(c.data, '%H:%i')    AS hora
              FROM checkin c
-             LEFT JOIN user u ON u.id=c.user_id
-             LEFT JOIN gym g ON g.id=c.gym_id
-             ${where} ORDER BY c.data DESC LIMIT ${perPage} OFFSET ${offset}`,
-            params
+             LEFT JOIN user u ON u.id = c.user_id
+             ORDER BY c.data DESC LIMIT ${perPage} OFFSET ${offset}`
         );
 
         const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -262,15 +242,14 @@ router.get('/checkins', async (req, res) => {
             return r ? Number(r.total) : 0;
         });
 
-        const [academias] = await db.execute('SELECT id, nome FROM gym WHERE status = "ativa"');
-        const [tc]  = await db.execute("SELECT COUNT(*) AS cnt FROM support_ticket WHERE status != 'resolvido'");
+        const [tc] = await db.execute("SELECT COUNT(*) AS cnt FROM support_ticket WHERE status != 'resolvido'");
         const adminConfig = buildAdminConfig(res.locals.config);
 
         res.render('pages/admin-checkins', {
             ticketCount: tc[0].cnt, adminConfig,
             title: 'Check-ins', page: 'checkins', admin: req.session.admin,
             items, total: Number(total), pages: Math.ceil(total / perPage), currentPage: pagina,
-            academia, academias, checkinsHoje: Number(checkinsHoje),
+            checkinsHoje: Number(checkinsHoje),
             heatmap: JSON.stringify(heatmap),
             diasSemana: JSON.stringify(diasSemana),
         });

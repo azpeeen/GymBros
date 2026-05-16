@@ -163,12 +163,12 @@ function validarCPF(cpf) {
 
 // Páginas públicas
 router.get('/', (req, res) => res.render('pages/index', { seo: {
-    title:         'GymBros — Academias Ilimitadas em Todo o Brasil',
-    description:   'Acesse 3.560+ academias parceiras, treinos online ao vivo e personal trainer IA com o GymBros. Planos a partir de R$ 64,90/mês.',
-    keywords:      'academia, treinos, fitness, personal trainer ia, gymbros, academias parceiras, treinos online',
+    title:         'GymBros — Treino Inteligente com IA',
+    description:   'Treine com inteligência artificial ao seu lado. Planos de treino, dieta e acompanhamento personalizados com o GymBros. A partir de R$ 64,90/mês.',
+    keywords:      'treino inteligente, personal trainer ia, gymbros, treinos online, saúde, bem-estar, ia fitness',
     canonical:     '/',
-    ogTitle:       'Treine em Qualquer Academia do Brasil — GymBros',
-    ogDescription: '3.560+ academias, treinos online e IA personal trainer. Comece agora.',
+    ogTitle:       'GymBros — Treino Inteligente com IA',
+    ogDescription: 'Planos de treino e dieta personalizados por IA. Comece agora.',
 }}));
 
 router.get('/login', (req, res) => res.render('pages/login', { seo: {
@@ -184,7 +184,7 @@ router.get('/login', (req, res) => res.render('pages/login', { seo: {
 router.get('/register', (req, res) => {
     res.render('pages/register', { user: req.session.user || null, seo: {
         title:         'Cadastro — GymBros',
-        description:   'Crie sua conta GymBros gratuitamente e acesse academias parceiras, treinos online e o personal trainer IA GymBot.',
+        description:   'Crie sua conta GymBros gratuitamente e acesse treinos personalizados, planos de dieta e o personal trainer IA GymBot.',
         keywords:      'cadastro gymbros, criar conta, registrar gymbros',
         canonical:     '/register',
         ogTitle:       'Crie sua Conta GymBros Grátis',
@@ -194,25 +194,25 @@ router.get('/register', (req, res) => {
 
 router.get('/planos', (req, res) => res.render('pages/planos', { seo: {
     title:         'Planos GymBros: Starter, GymBro e Black',
-    description:   'Compare os planos GymBros: Starter (R$64,90), GymBro (R$85,60) e Black (R$145,90). Academias ilimitadas, treinos online e personal trainer IA.',
-    keywords:      'planos gymbros, preço academia, assinatura academia, plano fitness',
+    description:   'Compare os planos GymBros: Starter (R$64,90), GymBro (R$85,60) e Black (R$145,90). Treino inteligente, IA personalizada e acompanhamento completo.',
+    keywords:      'planos gymbros, treino com ia, assinatura fitness, plano treino ia',
     canonical:     '/planos',
     ogTitle:       'Escolha seu Plano GymBros — A partir de R$64,90',
-    ogDescription: 'Starter, GymBro ou Black. Academias ilimitadas + IA personal trainer.',
+    ogDescription: 'Starter, GymBro ou Black. Treino inteligente + IA personal trainer.',
 }}));
 
 router.get('/academias', (req, res) => res.render('pages/academias', { seo: {
-    title:         'Academias Parceiras GymBros — Encontre a Sua',
-    description:   'Encontre academias e estúdios parceiros do GymBros perto de você no mapa interativo. Mais de 3.560 locais em todo o Brasil.',
-    keywords:      'academias parceiras, academia perto de mim, gymbros academias, mapa academia',
+    title:         'Academias — GymBros',
+    description:   'Encontre academias e estúdios cadastrados no GymBros perto de você.',
+    keywords:      'academia, academia perto de mim, gymbros academias, mapa academia',
     canonical:     '/academias',
-    ogTitle:       'Academias GymBros Perto de Você — Mapa Interativo',
-    ogDescription: 'Localize 3.560+ academias parceiras no mapa. Treine onde quiser.',
+    ogTitle:       'Academias GymBros — Mapa',
+    ogDescription: 'Encontre academias cadastradas no GymBros perto de você.',
 }}));
 
 router.get('/compra', (req, res) => res.render('pages/compra', { seo: {
     title:         'Assinar GymBros — Dados de Pagamento',
-    description:   'Finalize sua assinatura GymBros com segurança. Acesse academias parceiras e treinos online em minutos.',
+    description:   'Finalize sua assinatura GymBros com segurança. Acesse treinos personalizados por IA em minutos.',
     keywords:      'assinar gymbros, pagamento academia, contratar gymbros',
     canonical:     '/compra',
     robots:        'noindex, nofollow',
@@ -232,7 +232,7 @@ router.get('/compra2', (req, res) => res.render('pages/compra2', { seo: {
 
 router.get('/compra3', (req, res) => res.render('pages/compra3', { seo: {
     title:         'Assinatura GymBros Confirmada!',
-    description:   'Sua assinatura GymBros foi confirmada! Acesse agora academias parceiras, treinos online e o GymBot personal trainer IA.',
+    description:   'Sua assinatura GymBros foi confirmada! Acesse agora treinos personalizados por IA e o GymBot personal trainer IA.',
     keywords:      'assinatura confirmada gymbros, bem vindo gymbros',
     canonical:     '/compra3',
     robots:        'noindex, nofollow',

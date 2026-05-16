@@ -5,16 +5,22 @@
     box-sizing: border-box;
 }
 
-html, body {
+html {
     font-size: 56.25%;
-    overflow-x: hidden !important; /* bloqueia rolagem lateral */
-    width: 100% !important;
-    position: relative;
+    overflow-x: hidden;
+    max-width: 100%;
+    touch-action: pan-y;
 }
 
 body {
+    font-size: 56.25%;
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100%;
+    position: relative;
     font-family: 'Arial', sans-serif;
     color: #FFFFFF;
+    touch-action: pan-y;
 }
 
 /* Títulos e textos */
@@ -215,6 +221,43 @@ p, a {
     opacity: 1;
 }
 
+/* Categorias de Treino */
+.categorias-treino {
+    margin-top: 4rem !important;
+    margin-bottom: 4rem !important;
+    padding: 2.5rem 0 2rem !important;
+}
+
+.categorias-treino h2 {
+    font-size: 2.2rem !important;
+    margin-bottom: 0.4rem !important;
+}
+
+.categorias-subtitle {
+    font-size: 1.4rem !important;
+    margin-bottom: 1.6rem !important;
+}
+
+.categories-outer {
+    overflow: hidden !important;
+    max-width: 100% !important;
+}
+
+.category-item {
+    padding: 12px 18px !important;
+    min-width: 90px !important;
+    border-radius: 12px !important;
+}
+
+.category-item svg {
+    width: 24px !important;
+    height: 24px !important;
+}
+
+.category-item span {
+    font-size: 1.2rem !important;
+}
+
 /* Parceiros */
 .parceiros {
     background-color: #DDB872 !important;
@@ -256,4 +299,87 @@ p, a {
     object-fit: cover !important;
     user-select: none !important;
     pointer-events: none !important;
+}
+
+/* ── Novas seções mobile ────────────────────────────────── */
+
+/* Impact Numbers */
+.impact-numbers {
+    padding: 48px 5% !important;
+}
+
+.impact-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1.6rem !important;
+}
+
+.impact-number {
+    font-size: 4rem !important;
+}
+
+.impact-label {
+    font-size: 1.3rem !important;
+}
+
+/* Split Sections */
+.split-section {
+    flex-direction: column !important;
+    gap: 3.2rem !important;
+}
+
+.ai-section,
+.execution-section {
+    padding: 48px 5% !important;
+}
+
+.split-text h2 {
+    font-size: 2.8rem !important;
+}
+
+.split-text p {
+    font-size: 1.6rem !important;
+}
+
+.split-image {
+    width: 100% !important;
+}
+
+/* IA: imagem preenche toda a largura disponível */
+.ai-section .photo-placeholder {
+    width: 100% !important;
+}
+
+.ai-section .photo-placeholder img {
+    width: 100% !important;
+    height: auto !important;
+}
+
+/* Execução: mantém proporção de phone */
+.execution-section .photo-placeholder img {
+    width: 200px !important;
+    height: auto !important;
+}
+
+/* How It Works */
+.how-it-works {
+    padding: 48px 5% !important;
+}
+
+.how-it-works > h2 {
+    font-size: 2.8rem !important;
+    margin-bottom: 3.2rem !important;
+}
+
+.steps-grid {
+    flex-direction: column !important;
+    gap: 2rem !important;
+}
+
+.step-card {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.step-connector {
+    display: none !important;
 }
