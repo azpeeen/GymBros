@@ -120,6 +120,15 @@ const rules = {
 // LOGIN
 // =============================================
 if (loginForm) {
+    const loginBtn = loginForm.querySelector('button[type="submit"]');
+
+    function setLoginLoading(on) {
+        loginBtn.disabled = on;
+        loginBtn.innerHTML = on
+            ? '<span class="btn-spinner"></span>'
+            : 'Entrar';
+    }
+
     loginForm.addEventListener('submit', async e => {
         e.preventDefault();
         loginForm.querySelectorAll('.error-message').forEach(el => el.textContent = '');
@@ -129,6 +138,7 @@ if (loginForm) {
         const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value;
 
+        setLoginLoading(true);
         try {
             const urlParams  = new URLSearchParams(window.location.search);
             const redirectTo = urlParams.get('redirect') || '';
@@ -140,6 +150,7 @@ if (loginForm) {
             const data = await res.json();
 
             if (res.status !== 200) {
+                setLoginLoading(false);
                 data.erros.forEach(err => {
                     const input = document.getElementById(err.param);
                     const el    = document.getElementById(`${err.param}-error`);
@@ -153,6 +164,7 @@ if (loginForm) {
             setTimeout(() => { window.location.href = data.redirect || '/area-aluno'; }, 1000);
         } catch (err) {
             console.error(err);
+            setLoginLoading(false);
             successEl.textContent = 'Erro inesperado. Tente novamente.';
         }
     });
