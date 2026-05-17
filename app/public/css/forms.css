@@ -262,6 +262,22 @@ body {
     filter .2s ease;
 }
 
+.btn:disabled { cursor: not-allowed; filter: brightness(0.9); transform: none; }
+
+.btn-spinner {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(0, 0, 0, 0.2);
+  border-top-color: #111;
+  border-radius: 50%;
+  animation: btn-spin 0.7s linear infinite;
+}
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
 .btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 44px rgba(201, 139, 29, .30);
