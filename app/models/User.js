@@ -78,7 +78,8 @@ class User {
     static async update(id, fields) {
         const allowed = ['nome', 'email', 'cep', 'telefone', 'profile_photo', 'status',
                          'last_seen', 'notification_interval_days', 'last_imc_update',
-                         'last_avaliacao_update', 'senha_hash'];
+                         'last_avaliacao_update', 'senha_hash', 'instagram_username',
+                         'username', 'bio', 'medalhas_destaque'];
         const entries = Object.entries(fields).filter(([k, v]) => allowed.includes(k) && v !== undefined);
         if (!entries.length) return;
         const sets   = entries.map(([k]) => `${k} = ?`);

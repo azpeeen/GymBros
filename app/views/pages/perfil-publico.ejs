@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<%- include('../partials/seo') %>
+<link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/footer.css">
+<% if (isProprioPerfilId) { %>
+<link rel="stylesheet" href="/css/area-aluno.css">
+<% } else { %>
+<link rel="stylesheet" href="/css/style.css">
+<% } %>
+<link rel="stylesheet" href="/css/perfil-publico.css">
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+</head>
+<body>
+
+<%- include('../partials/header') %>
+
+<% if (isProprioPerfilId && user) { %>
+<!-- ═══════════════════════════════════════════════════════
+     VERSÃO PRÓPRIA — sidebar + botão editar
+═══════════════════════════════════════════════════════ -->
+<section class="aluno-dashboard">
+    <section class="sidebar-overlay" id="sidebarOverlay"></section>
+    <%- include('../partials/sidebar-aluno') %>
+
+    <section class="aluno-main">
+
+        <!-- Cabeçalho com botão editar -->
+        <section class="pp-own-header">
+            <h1 class="pp-own-title"><i class="fas fa-user-circle"></i> Meu Perfil</h1>
+            <a href="/config" class="btn-pedir-ia" style="text-decoration:none;">
+                <i class="fas fa-edit"></i> Editar perfil
+            </a>
+        </section>
+
+        <!-- HERO -->
+        <section class="pp-hero">
+            <section class="pp-avatar-wrap">
+                <img class="pp-avatar"
+                     src="<%= perfil.profile_photo || '/images/avatar.png' %>"
+                     alt="<%= perfil.nome %>">
+                <% if (perfil.instagram_username) { %>
+                <a class="pp-insta-link"
+                   href="https://instagram.com/<%= perfil.instagram_username %>"
+                   target="_blank" rel="noopener noreferrer">
+                    <i class="fab fa-instagram"></i> @<%= perfil.instagram_username %>
+                </a>
+                <% } %>
+            </section>
+            <section class="pp-hero-info">
+                <h2 class="pp-nome"><%= perfil.nome %></h2>
+                <% if (perfil.bio) { %>
+                <p class="pp-bio"><%= perfil.bio %></p>
+                <% } %>
+                <p class="pp-since">
+                    <i class="fas fa-calendar-alt"></i>
+                    Membro desde <%= new Date(perfil.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) %>
+                </p>
+                <% if (perfil.planoSlug) { %>
+                <span class="pp-plano">
+                    <%= perfil.planoSlug === 'black' ? '⚫ Black' : perfil.planoSlug === 'gymbro' ? '💛 GymBro' : '🔵 Starter' %>
+                </span>
+                <% } %>
+                <section class="pp-hero-badges">
+                    <% if (streak > 0) { %>
+                    <span class="pp-badge pp-badge--streak">🔥 <%= streak %> dia<%= streak !== 1 ? 's' : '' %></span>
+                    <% } %>
+                    <% conquistasHero.forEach(c => { %>
+                    <span class="pp-badge pp-badge--conquista pp-badge--<%= c.tier %>">
+                        <span class="pp-badge-icone"><%= c.icone %></span>
+                        <span><%= c.nome %></span>
+                    </span>
+                    <% }) %>
+                </section>
+            </section>
+        </section>
+
+        <!-- STATS -->
+        <section class="pp-stats">
+            <section class="pp-stat">
+                <section class="pp-stat-icon"><i class="fas fa-dumbbell"></i></section>
+                <span class="pp-stat-num"><%= totalSessoes %></span>
+                <span class="pp-stat-label">Sessões</span>
+            </section>
+            <section class="pp-stat">
+                <section class="pp-stat-icon"><i class="fas fa-trophy"></i></section>
+                <span class="pp-stat-num"><%= conquistas.length %></span>
+                <span class="pp-stat-label">Conquistas</span>
+            </section>
+            <section class="pp-stat">
+                <section class="pp-stat-icon"><i class="fas fa-fire"></i></section>
+                <span class="pp-stat-num"><%= streak %></span>
+                <span class="pp-stat-label">Streak 🔥</span>
+            </section>
+        </section>
+
+        <!-- CONQUISTAS -->
+        <% if (conquistas.length > 0) { %>
+        <p class="pp-section-title">
+            <i class="fas fa-trophy"></i>
+            Conquistas desbloqueadas
+            <span class="pp-count-badge"><%= conquistas.length %></span>
+        </p>
+        <section class="pp-conquistas">
+            <% conquistas.forEach(c => { %>
+            <section class="pp-conquista pp-conquista--<%= c.tier %>">
+                <span class="pp-conquista-icon"><%= c.icone %></span>
+                <section class="pp-conquista-info">
+                    <span class="pp-conquista-nome"><%= c.nome %></span>
+                    <span class="pp-conquista-tier"><%= c.tier %></span>
+                </section>
+            </section>
+            <% }) %>
+        </section>
+        <% } else { %>
+        <section class="pp-vazio">
+            <i class="fas fa-trophy" style="font-size:2rem;color:#333;display:block;margin-bottom:12px;"></i>
+            Nenhuma conquista desbloqueada ainda.
+        </section>
+        <% } %>
+
+    </section>
+</section>
+
+<% } else { %>
+<!-- ═══════════════════════════════════════════════════════
+     VERSÃO PÚBLICA — sem sidebar, com CTA
+═══════════════════════════════════════════════════════ -->
+<main class="pp-main">
+
+    <!-- HERO -->
+    <section class="pp-hero">
+        <section class="pp-avatar-wrap">
+            <img class="pp-avatar"
+                 src="<%= perfil.profile_photo || '/images/avatar.png' %>"
+                 alt="<%= perfil.nome %>">
+            <% if (perfil.instagram_username) { %>
+            <a class="pp-insta-link"
+               href="https://instagram.com/<%= perfil.instagram_username %>"
+               target="_blank" rel="noopener noreferrer">
+                <i class="fab fa-instagram"></i> @<%= perfil.instagram_username %>
+            </a>
+            <% } %>
+        </section>
+        <section class="pp-hero-info">
+            <h1 class="pp-nome"><%= perfil.nome %></h1>
+            <% if (perfil.bio) { %>
+            <p class="pp-bio"><%= perfil.bio %></p>
+            <% } %>
+            <p class="pp-since">
+                <i class="fas fa-calendar-alt"></i>
+                Membro desde <%= new Date(perfil.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) %>
+            </p>
+            <% if (perfil.planoSlug) { %>
+            <span class="pp-plano">
+                <%= perfil.planoSlug === 'black' ? '⚫ Black' : perfil.planoSlug === 'gymbro' ? '💛 GymBro' : '🔵 Starter' %>
+            </span>
+            <% } %>
+            <section class="pp-hero-badges">
+                <% if (streak > 0) { %>
+                <span class="pp-badge pp-badge--streak">🔥 <%= streak %> dia<%= streak !== 1 ? 's' : '' %></span>
+                <% } %>
+                <% conquistasHero.forEach(c => { %>
+                <span class="pp-badge pp-badge--conquista pp-badge--<%= c.tier %>">
+                    <span class="pp-badge-icone"><%= c.icone %></span>
+                    <span><%= c.nome %></span>
+                </span>
+                <% }) %>
+            </section>
+        </section>
+    </section>
+
+    <!-- STATS -->
+    <section class="pp-stats">
+        <section class="pp-stat">
+            <section class="pp-stat-icon"><i class="fas fa-dumbbell"></i></section>
+            <span class="pp-stat-num"><%= totalSessoes %></span>
+            <span class="pp-stat-label">Sessões</span>
+        </section>
+        <section class="pp-stat">
+            <section class="pp-stat-icon"><i class="fas fa-trophy"></i></section>
+            <span class="pp-stat-num"><%= conquistas.length %></span>
+            <span class="pp-stat-label">Conquistas</span>
+        </section>
+        <section class="pp-stat">
+            <section class="pp-stat-icon"><i class="fas fa-fire"></i></section>
+            <span class="pp-stat-num"><%= streak %></span>
+            <span class="pp-stat-label">Streak 🔥</span>
+        </section>
+    </section>
+
+    <!-- CONQUISTAS -->
+    <% if (conquistas.length > 0) { %>
+    <p class="pp-section-title">
+        <i class="fas fa-trophy"></i>
+        Conquistas desbloqueadas
+        <span class="pp-count-badge"><%= conquistas.length %></span>
+    </p>
+    <section class="pp-conquistas">
+        <% conquistas.forEach(c => { %>
+        <section class="pp-conquista pp-conquista--<%= c.tier %>">
+            <span class="pp-conquista-icon"><%= c.icone %></span>
+            <section class="pp-conquista-info">
+                <span class="pp-conquista-nome"><%= c.nome %></span>
+                <span class="pp-conquista-tier"><%= c.tier %></span>
+            </section>
+        </section>
+        <% }) %>
+    </section>
+    <% } else { %>
+    <section class="pp-vazio">
+        <i class="fas fa-trophy" style="font-size:2rem;color:#333;display:block;margin-bottom:12px;"></i>
+        Nenhuma conquista desbloqueada ainda.
+    </section>
+    <% } %>
+
+    <!-- CTA — só na versão pública -->
+    <section class="pp-cta">
+        <h2 class="pp-cta-title">Comece sua jornada no GymBros</h2>
+        <p class="pp-cta-desc">IA treinadora, execução com GIFs e conquistas como <%= perfil.nome %></p>
+        <a href="/register" class="pp-cta-btn">Criar conta grátis →</a>
+    </section>
+
+</main>
+<% } %>
+
+<%- include('../partials/footer') %>
+
+<% if (isProprioPerfilId && user) { %>
+<script>
+(function () {
+    var btn     = document.getElementById('menuToggle');
+    var sidebar = document.querySelector('.aluno-sidebar');
+    var overlay = document.getElementById('sidebarOverlay');
+    if (!btn || !sidebar || !overlay) return;
+    function openMenu()  { sidebar.classList.add('open'); overlay.classList.add('open'); document.body.style.overflow = 'hidden'; }
+    function closeMenu() { sidebar.classList.remove('open'); overlay.classList.remove('open'); document.body.style.overflow = ''; }
+    btn.addEventListener('click', openMenu);
+    overlay.addEventListener('click', closeMenu);
+    sidebar.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeMenu); });
+})();
+</script>
+<% } %>
+</body>
+</html>

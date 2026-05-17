@@ -6,6 +6,7 @@
 <%- include('../partials/seo') %>
 <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
 <link rel="stylesheet" href="/css/execucao-treino.css">
+<link rel="stylesheet" href="/css/conquistas.css">
 </head>
 <body class="exec-page">
 
@@ -146,7 +147,7 @@
 
 <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-
+<script src="/js/conquistas.js"></script>
 <script>
 // ── Dados do servidor ─────────────────────────────────────
 const PLANO           = <%- JSON.stringify(plano) %>;
@@ -267,12 +268,12 @@ function renderEx(idx) {
     // Input de carga
     document.getElementById('cargaInput').value = cargas[idx] || '';
 
-    // Botão realizado
+    // Botão realizado — não resetar se countdown ativo
     const btn = document.getElementById('btnRealizado');
     if (isExDone(idx)) {
         btn.className = 'exec-btn-realizado concluido';
         document.getElementById('realizadoLabel').innerHTML = '<i class="fas fa-check-double"></i><br>Feito';
-    } else {
+    } else if (!countdownActive) {
         btn.className = 'exec-btn-realizado';
         document.getElementById('realizadoLabel').innerHTML = '<i class="fas fa-check"></i><br>Realizado';
     }
@@ -323,30 +324,32 @@ function marcarSerie(idx, serieIdx) {
     }
 
     // Inicia countdown de descanso
-    startCountdown(descanso, idx, doneSeries);
+    startCountdown(descanso);
 }
 
-function startCountdown(seconds, idx, doneSeries) {
+function startCountdown(seconds) {
     countdownActive = true;
-    const btn   = document.getElementById('btnRealizado');
-    const label = document.getElementById('realizadoLabel');
-    const ring  = document.getElementById('countdownRing');
+    const fim    = Date.now() + seconds * 1000;
+    localStorage.setItem('gymbros_pausa_fim', String(fim));
+
+    const btn    = document.getElementById('btnRealizado');
+    const label  = document.getElementById('realizadoLabel');
+    const ring   = document.getElementById('countdownRing');
     const circum = 232; // 2π × 37
 
     btn.className = 'exec-btn-realizado counting';
     ring.style.strokeDashoffset = '0';
 
-    let remaining = seconds;
-    label.innerHTML = `<span style="font-size:1.3rem;font-weight:900;color:#4caf50">${remaining}</span>`;
-
     countdownId = setInterval(() => {
-        remaining--;
-        const progress = ((seconds - remaining) / seconds) * circum;
+        const remaining = Math.max(0, Math.ceil((fim - Date.now()) / 1000));
+        const elapsed   = seconds - remaining;
+        const progress  = (elapsed / seconds) * circum;
         ring.style.strokeDashoffset = String(progress);
 
         if (remaining <= 0) {
             clearInterval(countdownId);
             countdownActive = false;
+            localStorage.removeItem('gymbros_pausa_fim');
             btn.className = 'exec-btn-realizado';
             label.innerHTML = '<i class="fas fa-check"></i><br>Realizado';
             ring.style.strokeDashoffset = String(circum);
@@ -356,15 +359,28 @@ function startCountdown(seconds, idx, doneSeries) {
     }, 1000);
 }
 
-function persistExercicio(idx) {
+async function persistExercicio(idx) {
     if (!sessaoId) return;
     const ex = EXERCICIOS[idx];
-    apiFetch('/treinos/sessao/exercicio/concluir', {
-        sessao_id:        sessaoId,
-        exercise_query:   ex.exercise_query,
-        series_realizadas: Number(ex.series) || 3,
-        carga_usada:      cargas[idx] || null,
-    });
+    try {
+        const r = await fetch('/treinos/sessao/exercicio/concluir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sessao_id:         sessaoId,
+                exercise_query:    ex.exercise_query,
+                series_realizadas: Number(ex.series) || 3,
+                carga_usada:       cargas[idx] || null,
+            }),
+        });
+        const data = await r.json();
+        if (data.novasConquistas?.length) {
+            for (const c of data.novasConquistas) {
+                await mostrarAnimacaoConquista(c);
+                await sleep(400);
+            }
+        }
+    } catch {}
 }
 
 // ── Views ─────────────────────────────────────────────────
@@ -448,14 +464,22 @@ async function mostrarConclusao() {
         </button>
     `;
 
-    // Persiste finalização
+    // Persiste finalização e verifica conquistas
     if (sessaoId) {
         try {
-            await fetch('/treinos/sessao/finalizar', {
+            const r = await fetch('/treinos/sessao/finalizar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessao_id: sessaoId }),
             });
+            const data = await r.json();
+            if (data.novasConquistas?.length) {
+                await sleep(600);
+                for (const c of data.novasConquistas) {
+                    await mostrarAnimacaoConquista(c);
+                    await sleep(400);
+                }
+            }
         } catch {}
     }
 }
@@ -643,6 +667,18 @@ document.getElementById('btnRetomadaNao').addEventListener('click', async () => 
 // ── Init ──────────────────────────────────────────────────
 (async () => {
     renderEx(exIdx);
+
+    // Retomar timer de pausa se existir (persiste ao navegar)
+    const fimSalvo = localStorage.getItem('gymbros_pausa_fim');
+    if (fimSalvo) {
+        const restante = Math.max(0, Math.ceil((parseInt(fimSalvo, 10) - Date.now()) / 1000));
+        if (restante > 0) {
+            startCountdown(restante);
+        } else {
+            localStorage.removeItem('gymbros_pausa_fim');
+        }
+    }
+
     <% if (!sessaoExistente) { %>
     await iniciarSessao();
     startCron();

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -33,7 +33,7 @@
             <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
             <li><a href="/meu-plano" class="active" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
-            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -43,14 +43,16 @@
             <% } %>
             <li><a href="/imc-form" data-translate="sidebar.imc"><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</a></li>
             <li><a href="/suporte" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/perfil/<%= user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
         </ul>
     </section>
 
     <!-- CONTEÚDO PRINCIPAL -->
     <section class="aluno-main">
         <section class="dashboard-top">
-            <h1>Meu Plano</h1>
-            <p>Gerencie sua assinatura, veja benefícios e compare com outros planos.</p>
+            <h1 data-i18n="myplan.title">Meu Plano</h1>
+            <p data-i18n="myplan.subtitle">Gerencie sua assinatura, veja benefícios e compare com outros planos.</p>
         </section>
 
         <!-- PLANO ATUAL -->
@@ -69,7 +71,7 @@
                         <small>/<%= planoAtual.periodo %></small>
                     </section>
                     <span class="plano-atual-badge">
-                        <i class="fas fa-check-circle"></i> Plano ativo
+                        <i class="fas fa-check-circle"></i> <span data-i18n="myplan.active">Plano ativo</span>
                     </span>
                 </section>
             </section>
@@ -93,7 +95,7 @@
                 <section class="plano-renew-bar">
                     <section class="plano-renew-fill" id="renew-fill"></section>
                 </section>
-                <section class="plano-renew-note">Seu plano renova automaticamente na data acima.</section>
+                <section class="plano-renew-note" data-i18n="myplan.renew">Seu plano renova automaticamente na data acima.</section>
             </section>
 
             <!-- Ações -->
@@ -110,7 +112,7 @@
 
         <!-- OUTROS PLANOS -->
         <section class="outros-planos-titulo">
-            <i class="fas fa-exchange-alt"></i> Outros Planos Disponíveis
+            <i class="fas fa-exchange-alt"></i> <span data-i18n="myplan.others">Outros Planos Disponíveis</span>
         </section>
 
         <section class="outros-planos-grid">

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -32,7 +32,7 @@
             <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
             <li><a href="/meu-plano" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
-            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -42,14 +42,16 @@
             <% } %>
             <li><a href="/imc-form" class="active" data-translate="sidebar.imc"><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</a></li>
             <li><a href="/suporte" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/perfil/<%= user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
         </ul>
     </section>
 
     <!-- CONTEÚDO PRINCIPAL -->
     <section class="aluno-main">
         <section class="dashboard-top">
-            <h1><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</h1>
-            <p>Preencha seu perfil para receber orientações personalizadas do GymBot</p>
+            <h1><i class="fas fa-clipboard-list"></i> <span data-i18n="imc.title">Meu Perfil IMC</span></h1>
+            <p data-i18n="imc.subtitle">Preencha seu perfil para receber orientações personalizadas do GymBot</p>
         </section>
 
         <!-- VIEW DE PERFIL SALVO (renderizado via JS) -->
@@ -87,12 +89,12 @@
 
                 <section class="imc-row">
                     <section class="imc-field">
-                        <label for="peso">Peso (kg)</label>
+                        <label for="peso" data-i18n="imc.weight">Peso (kg)</label>
                         <input type="number" id="peso" name="peso" placeholder="Ex: 75" min="30" max="300" step="0.1">
                         <span class="field-error" id="peso-error"></span>
                     </section>
                     <section class="imc-field">
-                        <label for="altura">Altura (cm)</label>
+                        <label for="altura" data-i18n="imc.height">Altura (cm)</label>
                         <input type="number" id="altura" name="altura" placeholder="Ex: 175" min="100" max="250">
                         <span class="field-error" id="altura-error"></span>
                     </section>
@@ -360,13 +362,13 @@
                 <i class="fas fa-times"></i> Cancelar
             </button>
             <button type="button" class="imc-btn-back" id="btnBack" style="display:none">
-                <i class="fas fa-arrow-left"></i> Voltar
+                <i class="fas fa-arrow-left"></i> <span data-i18n="imc.step.back">Voltar</span>
             </button>
             <button type="button" class="imc-btn-next" id="btnNext">
-                Avançar <i class="fas fa-arrow-right"></i>
+                <span data-i18n="imc.step.next">Avançar</span> <i class="fas fa-arrow-right"></i>
             </button>
             <button type="button" class="imc-btn-submit" id="btnSubmit" style="display:none">
-                <i class="fas fa-check"></i> Salvar Perfil
+                <i class="fas fa-check"></i> <span data-i18n="imc.save">Salvar Perfil</span>
             </button>
         </section>
 

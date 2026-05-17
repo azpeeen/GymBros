@@ -31,7 +31,7 @@
             <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
             <li><a href="/meu-plano" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
-            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -41,6 +41,8 @@
             <% } %>
             <li><a href="/imc-form" data-translate="sidebar.imc"><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</a></li>
             <li><a href="/suporte" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/perfil/<%= user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
         </ul>
     </section>
 
@@ -76,8 +78,8 @@
         <!-- BANNER DE BOAS-VINDAS -->
         <section class="dash-welcome">
             <section class="dash-welcome-text">
-                <h1>Bem-vindo, <%= user.nome %>!</h1>
-                <p>Acompanhe seu progresso, treinos e planos</p>
+                <h1><span data-i18n="dashboard.welcome">Bem-vindo</span>, <%= user.nome %>!</h1>
+                <p data-i18n="dashboard.subtitle">Acompanhe seu progresso, treinos e planos</p>
             </section>
             <section class="dash-welcome-badge">
                 <i class="fas fa-dumbbell"></i>
@@ -91,8 +93,8 @@
                     <i class="fas fa-fire"></i>
                 </section>
                 <section class="dash-stat-info">
-                    <span class="dash-stat-val">3</span>
-                    <span class="dash-stat-label">Treinos esta semana</span>
+                    <span class="dash-stat-val"><%= checkinsNaSemana || 0 %></span>
+                    <span class="dash-stat-label" data-i18n="dashboard.weekly">Treinos esta semana</span>
                 </section>
             </section>
             <section class="dash-stat">
@@ -100,8 +102,8 @@
                     <i class="fas fa-trophy"></i>
                 </section>
                 <section class="dash-stat-info">
-                    <span class="dash-stat-val">2</span>
-                    <span class="dash-stat-label">Conquistas</span>
+                    <span class="dash-stat-val"><%= totalConquistas || 0 %></span>
+                    <span class="dash-stat-label" data-i18n="dashboard.achievements">Conquistas</span>
                 </section>
             </section>
             <section class="dash-stat">
@@ -109,8 +111,8 @@
                     <i class="fas fa-chart-line"></i>
                 </section>
                 <section class="dash-stat-info">
-                    <span class="dash-stat-val">60%</span>
-                    <span class="dash-stat-label">Meta semanal</span>
+                    <span class="dash-stat-val"><%= metaSemanal || 0 %>%</span>
+                    <span class="dash-stat-label" data-i18n="dashboard.goal">Meta semanal</span>
                 </section>
             </section>
         </section>
@@ -120,8 +122,8 @@
             <a href="/treinos" class="dash-action-card dash-action-blue">
                 <section class="dash-action-icon"><i class="fas fa-dumbbell"></i></section>
                 <section class="dash-action-body">
-                    <span class="dash-action-title">Meus Treinos</span>
-                    <span class="dash-action-sub">Ver planilha de treinos</span>
+                    <span class="dash-action-title" data-i18n="treinos.title">Meus Treinos</span>
+                    <span class="dash-action-sub" data-i18n="dashboard.actions.treinos">Ver planilha de treinos</span>
                 </section>
                 <i class="fas fa-chevron-right dash-action-arrow"></i>
             </a>
@@ -129,7 +131,7 @@
                 <section class="dash-action-icon"><i class="fas fa-chart-line"></i></section>
                 <section class="dash-action-body">
                     <span class="dash-action-title">Evolução</span>
-                    <span class="dash-action-sub">Acompanhe seus resultados</span>
+                    <span class="dash-action-sub" data-i18n="dashboard.actions.evolucao">Acompanhe seus resultados</span>
                 </section>
                 <i class="fas fa-chevron-right dash-action-arrow"></i>
             </a>
@@ -145,7 +147,7 @@
 
         <!-- ATIVIDADES RECENTES -->
         <section class="dash-activities">
-            <h2><i class="fas fa-history"></i> Atividades Recentes</h2>
+            <h2><i class="fas fa-history"></i> <span data-i18n="dashboard.recent">Atividades Recentes</span></h2>
             <ul class="dash-activities-list">
                 <li>
                     <section class="dash-act-icon"><i class="fas fa-dumbbell"></i></section>
@@ -174,15 +176,20 @@
         <!-- META SEMANAL -->
         <section class="dash-goal-section">
             <section class="dash-goal-header">
-                <h2><i class="fas fa-bullseye"></i> Meta Semanal</h2>
-                <span class="dash-goal-count">3 / 5 treinos</span>
+                <h2><i class="fas fa-bullseye"></i> <span data-i18n="dashboard.goal.title">Meta Semanal</span></h2>
+                <span class="dash-goal-count"><%= checkinsNaSemana || 0 %> / 5 treinos</span>
             </section>
             <section class="dash-goal-bar">
                 <section class="dash-goal-fill" id="dashGoalFill"></section>
             </section>
             <section class="dash-badges">
-                <span class="dash-badge"><i class="fas fa-trophy"></i> 1ª Meta Semana</span>
-                <span class="dash-badge"><i class="fas fa-fire"></i> Consistência 3 dias</span>
+                <% if (ultimasConquistas && ultimasConquistas.length > 0) { %>
+                    <% ultimasConquistas.forEach(function(c) { %>
+                    <a href="/conquistas" class="dash-badge"><%= c.icone %> <%= c.nome %></a>
+                    <% }); %>
+                <% } else { %>
+                <a href="/conquistas" class="dash-badge"><i class="fas fa-trophy"></i> Ver conquistas</a>
+                <% } %>
             </section>
         </section>
 
@@ -199,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var fill = document.getElementById('dashGoalFill');
     if (fill) {
         requestAnimationFrame(function () {
-            fill.style.width = '60%';
+            fill.style.width = '<%= metaSemanal || 0 %>%';
         });
     }
 });

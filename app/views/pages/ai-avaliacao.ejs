@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -32,7 +32,7 @@
             <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
             <li><a href="/meu-plano" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
-            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" class="active" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -42,14 +42,16 @@
             <% } %>
             <li><a href="/imc-form" data-translate="sidebar.imc"><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</a></li>
             <li><a href="/suporte" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/perfil/<%= user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
         </ul>
     </section>
 
     <!-- CONTEÚDO PRINCIPAL -->
     <section class="aluno-main">
         <section class="dashboard-top">
-            <h1><i class="fas fa-camera"></i> Avaliação Corporal com IA</h1>
-            <p>Envie suas fotos e receba uma análise estimativa de composição corporal</p>
+            <h1><i class="fas fa-camera"></i> <span data-i18n="body.title">Avaliação Corporal com IA</span></h1>
+            <p data-i18n="body.subtitle">Envie suas fotos e receba uma análise estimativa de composição corporal</p>
         </section>
 
         <!-- FORMULÁRIO DE UPLOAD -->
@@ -58,8 +60,8 @@
             <section class="imc-step-header">
                 <i class="fas fa-camera imc-step-icon"></i>
                 <section>
-                    <h2>Enviar Fotos</h2>
-                    <p>Foto frontal obrigatória — lateral e posterior opcionais</p>
+                    <h2 data-i18n="body.photos.title">Enviar Fotos</h2>
+                    <p data-i18n="body.photos.desc">Foto frontal obrigatória — lateral e posterior opcionais</p>
                 </section>
             </section>
 
@@ -70,8 +72,8 @@
                     <input type="file" id="input-frontal" accept="image/*" aria-label="Foto frontal">
                     <img class="slot-preview" id="preview-frontal" alt="Pré-visualização frontal">
                     <i class="fas fa-user slot-icon"></i>
-                    <span class="slot-label">Foto Frontal</span>
-                    <span class="slot-required">* obrigatório</span>
+                    <span class="slot-label" data-i18n="body.photo.front">Foto Frontal</span>
+                    <span class="slot-required" data-i18n="body.required">* obrigatório</span>
                 </section>
 
                 <!-- Foto lateral -->
@@ -79,8 +81,8 @@
                     <input type="file" id="input-lateral" accept="image/*" aria-label="Foto lateral">
                     <img class="slot-preview" id="preview-lateral" alt="Pré-visualização lateral">
                     <i class="fas fa-user-circle slot-icon"></i>
-                    <span class="slot-label">Foto Lateral</span>
-                    <span class="slot-required">opcional</span>
+                    <span class="slot-label" data-i18n="body.photo.side">Foto Lateral</span>
+                    <span class="slot-required" data-i18n="body.optional">opcional</span>
                 </section>
 
                 <!-- Foto posterior -->
@@ -88,8 +90,8 @@
                     <input type="file" id="input-posterior" accept="image/*" aria-label="Foto posterior">
                     <img class="slot-preview" id="preview-posterior" alt="Pré-visualização posterior">
                     <i class="fas fa-walking slot-icon"></i>
-                    <span class="slot-label">Foto Posterior</span>
-                    <span class="slot-required">opcional</span>
+                    <span class="slot-label" data-i18n="body.photo.back">Foto Posterior</span>
+                    <span class="slot-required" data-i18n="body.optional">opcional</span>
                 </section>
 
             </section>
@@ -101,7 +103,7 @@
             </label>
 
             <button class="btn-analisar" id="btnAnalisar" disabled>
-                <i class="fas fa-search"></i> Analisar
+                <i class="fas fa-search"></i> <span data-i18n="body.analyze">Analisar</span>
             </button>
 
             <!-- Loading -->

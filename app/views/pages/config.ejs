@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -32,7 +32,7 @@
             <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
             <li><a href="/meu-plano" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
-            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -42,14 +42,16 @@
             <% } %>
             <li><a href="/imc-form" data-translate="sidebar.imc"><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</a></li>
             <li><a href="/suporte" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+            <li><a href="/config" class="active" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/perfil/<%= user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
         </ul>
     </section>
 
     <!-- CONTEÚDO PRINCIPAL -->
     <section class="aluno-main">
         <section class="dashboard-top">
-            <h1>Configurações</h1>
-            <p>Gerencie seu perfil, segurança e preferências</p>
+            <h1 data-i18n="config.title">Configurações</h1>
+            <p data-i18n="config.subtitle">Gerencie seu perfil, segurança e preferências</p>
         </section>
 
         <section class="cfg-grid">
@@ -58,37 +60,31 @@
             <section class="cfg-card" id="cfg-perfil">
                 <header class="cfg-card-header">
                     <span class="cfg-card-icon"><i class="fas fa-user"></i></span>
-                    <h2>Perfil</h2>
+                    <h2 data-i18n="config.profile">Perfil</h2>
                 </header>
 
-                <!-- Avatar upload -->
-                <section class="cfg-avatar-wrap">
-                    <section class="cfg-avatar-ring" id="avatarRing" title="Clique para trocar a foto">
-                        <img id="cfg-avatar-preview" src="<%= user.profile_photo || '/images/avatar.png' %>" alt="Foto de perfil">
-                        <section class="cfg-avatar-overlay">
-                            <i class="fas fa-camera"></i>
-                        </section>
+                <!-- Preview atual + link para editar -->
+                <section class="cfg-avatar-wrap" style="flex-direction:row;align-items:center;gap:16px;">
+                    <img src="<%= user.profile_photo || '/images/avatar.png' %>"
+                         style="width:56px;height:56px;border-radius:50%;border:2px solid #FFD700;object-fit:cover;flex-shrink:0"
+                         alt="Foto de perfil">
+                    <section>
+                        <p style="font-weight:700;margin:0;color:#fff"><%= user.nome %></p>
+                        <p style="font-size:0.8rem;color:#888;margin:4px 0 0">Foto, nome, bio, Instagram e medalhas</p>
                     </section>
-                    <input type="file" id="cfg-avatar-input" accept="image/jpeg,image/png,image/webp" style="display:none">
-                    <p class="cfg-avatar-hint">JPEG, PNG ou WebP · máx. 5 MB</p>
-                    <button class="cfg-btn cfg-btn-gold" id="cfg-avatar-btn" style="display:none">
-                        <i class="fas fa-upload"></i> Salvar foto
-                    </button>
-                    <p class="cfg-feedback" id="cfg-avatar-msg"></p>
                 </section>
+                <a href="/perfil/editar" class="cfg-btn cfg-btn-gold" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+                    <i class="fas fa-user-edit"></i> Editar perfil público
+                </a>
 
-                <!-- Dados pessoais -->
-                <form id="form-dados" class="cfg-form">
-                    <section class="cfg-field">
-                        <label for="cfg-nome">Nome completo</label>
-                        <input type="text" id="cfg-nome" name="nome" value="<%= user.nome %>" required>
-                    </section>
+                <!-- E-mail -->
+                <form id="form-dados" class="cfg-form" style="margin-top:8px;padding-top:20px;border-top:1px solid #2a2a2a;">
                     <section class="cfg-field">
                         <label for="cfg-email">E-mail</label>
                         <input type="email" id="cfg-email" name="email" value="<%= user.email %>" required>
                     </section>
                     <button type="submit" class="cfg-btn cfg-btn-gold">
-                        <i class="fas fa-save"></i> <span class="cfg-btn-text">Salvar alterações</span>
+                        <i class="fas fa-save"></i> <span class="cfg-btn-text" data-i18n="config.save.changes">Salvar e-mail</span>
                     </button>
                     <p class="cfg-feedback" id="cfg-dados-msg"></p>
                 </form>
@@ -98,7 +94,7 @@
             <section class="cfg-card" id="cfg-seguranca">
                 <header class="cfg-card-header">
                     <span class="cfg-card-icon"><i class="fas fa-lock"></i></span>
-                    <h2>Segurança</h2>
+                    <h2 data-i18n="config.security">Segurança</h2>
                 </header>
 
                 <form id="form-senha" class="cfg-form">
@@ -124,7 +120,7 @@
                         </section>
                     </section>
                     <button type="submit" class="cfg-btn cfg-btn-outline">
-                        <i class="fas fa-key"></i> <span class="cfg-btn-text">Alterar senha</span>
+                        <i class="fas fa-key"></i> <span class="cfg-btn-text" data-i18n="config.change.pass">Alterar senha</span>
                     </button>
                     <p class="cfg-feedback" id="cfg-senha-msg"></p>
                 </form>
@@ -134,7 +130,7 @@
             <section class="cfg-card" id="cfg-prefs">
                 <header class="cfg-card-header">
                     <span class="cfg-card-icon"><i class="fas fa-sliders-h"></i></span>
-                    <h2>Preferências</h2>
+                    <h2 data-i18n="config.prefs">Preferências</h2>
                 </header>
 
                 <section class="cfg-pref-list">
@@ -172,7 +168,7 @@
                 </section>
 
                 <section class="cfg-danger-zone">
-                    <h3><i class="fas fa-exclamation-triangle"></i> Zona de perigo</h3>
+                    <h3><i class="fas fa-exclamation-triangle"></i> <span data-i18n="config.danger">Zona de perigo</span></h3>
                     <a href="/logout" class="cfg-btn cfg-btn-danger">
                         <i class="fas fa-sign-out-alt"></i> Sair da conta
                     </a>
@@ -183,7 +179,7 @@
             <section class="cfg-card" id="cfg-notificacoes">
                 <header class="cfg-card-header">
                     <span class="cfg-card-icon"><i class="fas fa-bell"></i></span>
-                    <h2>Notificações</h2>
+                    <h2 data-i18n="config.notifications">Notificações</h2>
                 </header>
 
                 <p class="cfg-card-desc">Com que frequência você quer ser lembrado de atualizar seu perfil IMC e fazer avaliação corporal?</p>
@@ -215,7 +211,7 @@
                 </section>
 
                 <button type="button" class="cfg-btn cfg-btn-gold" id="btnSalvarNotif">
-                    <i class="fas fa-save"></i> <span class="cfg-btn-text">Salvar</span>
+                    <i class="fas fa-save"></i> <span class="cfg-btn-text" data-i18n="config.save.btn">Salvar</span>
                 </button>
                 <p class="cfg-feedback" id="notifFeedback"></p>
             </section>
@@ -224,7 +220,7 @@
             <section class="cfg-card" id="cfg-lembretes">
                 <header class="cfg-card-header">
                     <span class="cfg-card-icon"><i class="fas fa-bell"></i></span>
-                    <h2>Lembretes</h2>
+                    <h2 data-i18n="config.reminders">Lembretes</h2>
                 </header>
 
                 <p class="cfg-card-desc">Notificações push agendadas no seu dispositivo. Requer permissão de notificação ativada.</p>
@@ -234,7 +230,7 @@
                     <!-- Água -->
                     <section class="cfg-pref-row">
                         <section class="cfg-pref-info">
-                            <strong>💧 Lembrete de água</strong>
+                            <strong>💧 <span data-i18n="config.water">Lembrete de água</span></strong>
                             <span>Notificação periódica para se hidratar</span>
                         </section>
                         <button class="cfg-toggle" id="pref-agua" aria-label="Ativar lembrete de água">
@@ -254,7 +250,7 @@
                     <!-- Sono -->
                     <section class="cfg-pref-row">
                         <section class="cfg-pref-info">
-                            <strong>😴 Lembrete de sono</strong>
+                            <strong>😴 <span data-i18n="config.sleep">Lembrete de sono</span></strong>
                             <span>Notificação no horário de dormir</span>
                         </section>
                         <button class="cfg-toggle" id="pref-sono" aria-label="Ativar lembrete de sono">
@@ -269,7 +265,7 @@
                 </section>
 
                 <button type="button" class="cfg-btn cfg-btn-gold" id="btnSalvarLembretes">
-                    <i class="fas fa-save"></i> <span class="cfg-btn-text">Salvar lembretes</span>
+                    <i class="fas fa-save"></i> <span class="cfg-btn-text" data-i18n="config.save.reminders">Salvar lembretes</span>
                 </button>
                 <p class="cfg-feedback" id="lembretesFeedback"></p>
             </section>

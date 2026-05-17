@@ -214,7 +214,7 @@ body.light-mode .chat-textarea  { background: #DEDAD6; border-color: #CCC9C5; co
             <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
             <li><a href="/meu-plano" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
-            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -224,6 +224,8 @@ body.light-mode .chat-textarea  { background: #DEDAD6; border-color: #CCC9C5; co
             <% } %>
             <li><a href="/imc-form" data-translate="sidebar.imc"><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</a></li>
             <li><a href="/suporte" class="active" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/perfil/<%= user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
         </ul>
     </section>
 
@@ -233,18 +235,18 @@ body.light-mode .chat-textarea  { background: #DEDAD6; border-color: #CCC9C5; co
         <section class="suporte-header">
             <section class="suporte-header-icon"><i class="fas fa-headset"></i></section>
             <section>
-                <h1>Central de Suporte</h1>
-                <p>Abra chamados e acompanhe o status do seu atendimento</p>
+                <h1 data-i18n="support.title">Central de Suporte</h1>
+                <p data-i18n="support.subtitle">Abra chamados e acompanhe o status do seu atendimento</p>
             </section>
         </section>
 
         <!-- Abrir chamado -->
         <section class="suporte-card">
-            <section class="suporte-card-title"><i class="fas fa-plus-circle"></i> Abrir Novo Chamado</section>
+            <section class="suporte-card-title"><i class="fas fa-plus-circle"></i> <span data-i18n="support.new">Abrir Novo Chamado</span></section>
             <form id="form-ticket">
                 <section class="suporte-form-row">
                     <section>
-                        <label class="suporte-label">Assunto *</label>
+                        <label class="suporte-label" data-i18n="support.subject">Assunto *</label>
                         <input type="text" id="ticket-assunto" class="suporte-input" placeholder="Descreva brevemente o problema" required>
                     </section>
                     <section>
@@ -258,18 +260,18 @@ body.light-mode .chat-textarea  { background: #DEDAD6; border-color: #CCC9C5; co
                     </section>
                 </section>
                 <section style="margin-bottom:16px">
-                    <label class="suporte-label">Descrição *</label>
+                    <label class="suporte-label" data-i18n="support.desc">Descrição *</label>
                     <textarea id="ticket-descricao" class="suporte-textarea" rows="3" placeholder="Descreva detalhadamente o que aconteceu..." required></textarea>
                 </section>
                 <button type="submit" class="btn-suporte-submit">
-                    <i class="fas fa-paper-plane"></i> Enviar Chamado
+                    <i class="fas fa-paper-plane"></i> <span data-i18n="support.send">Enviar Chamado</span>
                 </button>
             </form>
         </section>
 
         <!-- Lista de tickets -->
         <section class="suporte-card">
-            <section class="suporte-card-title"><i class="fas fa-list"></i> Meus Chamados</section>
+            <section class="suporte-card-title"><i class="fas fa-list"></i> <span data-i18n="support.mytickets">Meus Chamados</span></section>
             <section id="tickets-list">
                 <p style="opacity:.4;font-size:.85rem;text-align:center;padding:20px">Carregando chamados...</p>
             </section>
