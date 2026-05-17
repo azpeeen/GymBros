@@ -739,6 +739,46 @@ body.light-mode .mic-btn:hover               { color: #C98B1D; border-color: #C9
 
 .send-recording-btn:hover { transform: scale(1.08); }
 
+/* ── Disclaimer message ──────────────────────────────── */
+.disclaimer-message .chat-bubble {
+    background: rgba(255, 215, 0, 0.05) !important;
+    border: 1px solid rgba(255, 215, 0, 0.2) !important;
+    border-left: 3px solid #FFD700 !important;
+    display: flex !important;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.75rem !important;
+    line-height: 1.45 !important;
+    white-space: normal !important;
+}
+.disclaimer-icon {
+    color: #FFD700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.disclaimer-content strong {
+    display: block;
+    color: #FFD700;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-bottom: 0.18rem;
+}
+.disclaimer-content p {
+    font-size: 0.73rem;
+    color: #999;
+    line-height: 1.45;
+    margin: 0;
+    white-space: normal;
+}
+.disclaimer-content p strong {
+    color: #bbb;
+    display: inline !important;
+    font-size: inherit;
+    font-weight: 600;
+}
+
 /* Lock indicator — aparece ao swipe up mobile */
 .lock-indicator {
     position: absolute;

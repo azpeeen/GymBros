@@ -6,6 +6,7 @@ const Fuse             = require('fuse.js');
 const multer           = require('multer');
 const { File }         = require('buffer');
 const requirePlanLevel = require('../middleware/requirePlanLevel');
+const conquistas       = require('../services/conquistas');
 const db               = require('../config/db');
 
 // Multer para upload de áudio (10 MB, formatos permitidos)
@@ -498,6 +499,8 @@ router.post('/avaliacao-salvar', requireIA, async (req, res) => {
         data: new Date().toLocaleDateString('pt-BR'),
     };
 
+    conquistas.verificarIA(req.session.user.id, 'avaliacao').catch(() => {});
+
     return res.json({ ok: true });
 });
 
@@ -683,6 +686,7 @@ router.post('/plan/save', requireIA, async (req, res) => {
                     JSON.stringify(normalized),
                 ]
             );
+            conquistas.verificarIA(userId, 'treino').catch(() => {});
             return res.json({ ok: true, id: result.insertId || null });
         }
 
@@ -699,6 +703,7 @@ router.post('/plan/save', requireIA, async (req, res) => {
                     JSON.stringify(plan.refeicoes || []),
                 ]
             );
+            conquistas.verificarIA(userId, 'dieta').catch(() => {});
             return res.json({ ok: true, id: result.insertId || null });
         }
 

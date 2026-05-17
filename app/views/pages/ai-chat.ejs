@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -31,7 +31,7 @@
             <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
             <li><a href="/meu-plano" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
-            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" class="active" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -41,14 +41,16 @@
             <% } %>
             <li><a href="/imc-form" data-translate="sidebar.imc"><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</a></li>
             <li><a href="/suporte" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/perfil/<%= user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
         </ul>
     </section>
 
     <!-- CONTEÚDO PRINCIPAL -->
     <section class="aluno-main">
         <section class="dashboard-top" id="dashboardTop">
-            <h1><i class="fas fa-robot"></i> Personal Trainer IA</h1>
-            <p>Tire suas dúvidas sobre treinos, exercícios, nutrição e muito mais</p>
+            <h1><i class="fas fa-robot"></i> <span data-i18n="chat.title">Personal Trainer IA</span></h1>
+            <p data-i18n="chat.subtitle">Tire suas dúvidas sobre treinos, exercícios, nutrição e muito mais</p>
         </section>
 
         <!-- Overlay escuro para drawer mobile da sidebar de conversas -->
@@ -60,7 +62,7 @@
             <!-- SIDEBAR DE CONVERSAS -->
             <section class="conv-sidebar" id="convSidebar">
                 <section class="conv-sidebar-header">
-                    <span>Conversas</span>
+                    <span data-i18n="chat.conversations">Conversas</span>
                     <button id="btnNewConv" title="Nova conversa">+</button>
                 </section>
                 <section class="conv-list" id="convList">
@@ -95,6 +97,15 @@
                             <p>Olá, <%= user.nome %>! 💪 Sou o GymBot, seu personal trainer virtual. Como posso te ajudar hoje? Pode me perguntar sobre treinos, exercícios, nutrição ou motivação!</p>
                         </section>
                     </section>
+                    <section class="chat-message bot-message disclaimer-message">
+                        <section class="chat-bubble disclaimer-bubble">
+                            <section class="disclaimer-icon"><i class="fas fa-exclamation-triangle"></i></section>
+                            <section class="disclaimer-content">
+                                <strong>Aviso importante</strong>
+                                <p>As respostas da IA têm caráter <strong>informativo e educacional</strong> e <strong>não substituem</strong> a orientação de um médico, nutricionista ou educador físico habilitado. Consulte sempre um profissional de saúde antes de iniciar qualquer programa de treino ou dieta.</p>
+                            </section>
+                        </section>
+                    </section>
                 </section>
 
                 <!-- INDICADOR DE DIGITANDO -->
@@ -120,11 +131,12 @@
                         type="text"
                         id="chatInput"
                         placeholder="Digite sua mensagem..."
+                        data-i18n-placeholder="chat.placeholder"
                         autocomplete="off"
                         maxlength="500"
                     />
                     <button id="sendBtn" onclick="sendMessage()">
-                        <i class="fas fa-paper-plane"></i> <span class="btn-label">Enviar</span>
+                        <i class="fas fa-paper-plane"></i> <span class="btn-label" data-i18n="chat.send">Enviar</span>
                     </button>
                 </section>
 

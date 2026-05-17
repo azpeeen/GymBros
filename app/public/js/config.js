@@ -30,8 +30,9 @@ if (formDados) {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({
-                    nome:  document.getElementById('cfg-nome').value.trim(),
-                    email: document.getElementById('cfg-email').value.trim(),
+                    nome:               document.getElementById('cfg-nome').value.trim(),
+                    email:              document.getElementById('cfg-email').value.trim(),
+                    instagram_username: (document.getElementById('cfg-instagram')?.value || '').trim().replace(/^@/, ''),
                 }),
             });
             const data = await res.json();

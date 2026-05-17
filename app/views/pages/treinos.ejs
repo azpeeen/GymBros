@@ -32,7 +32,7 @@
             <li><a href="/treinos" class="active" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
             <li><a href="/meu-plano" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
-            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -42,14 +42,16 @@
             <% } %>
             <li><a href="/imc-form" data-translate="sidebar.imc"><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</a></li>
             <li><a href="/suporte" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li><a href="/perfil/<%= user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
         </ul>
     </section>
 
     <!-- CONTEÚDO PRINCIPAL -->
     <section class="aluno-main">
         <section class="dashboard-top">
-            <h1><i class="fas fa-dumbbell"></i> Meus Treinos</h1>
-            <p>Registre suas sessões e acompanhe seu progresso</p>
+            <h1><i class="fas fa-dumbbell"></i> <span data-i18n="treinos.title">Meus Treinos</span></h1>
+            <p data-i18n="treinos.subtitle">Registre suas sessões e acompanhe seu progresso</p>
         </section>
 
         <!-- CHECK-IN CARD -->
@@ -61,9 +63,10 @@
         <% if (iaPlanos && iaPlanos.length > 0) { %>
         <section class="ia-plano-section">
             <section class="ia-plano-header">
-                <h2><i class="fas fa-robot"></i> Seus Planos de Treino</h2>
-                <a href="/ai/chat" class="btn-pedir-ia btn-pedir-ia--sm"><i class="fas fa-plus"></i> Novo treino</a>
+                <h2><i class="fas fa-robot"></i> <span data-i18n="treinos.plans.title">Seus Planos de Treino</span></h2>
+                <a href="/ai/chat" class="btn-pedir-ia btn-pedir-ia--sm"><i class="fas fa-plus"></i> <span data-i18n="treinos.plans.new">Novo treino</span></a>
             </section>
+            <%- include('../partials/ai-disclaimer') %>
             <!-- TABS -->
             <section class="ia-tabs-nav">
                 <% iaPlanos.forEach((plano, idx) => { %>
@@ -102,7 +105,7 @@
                         <% }) %>
                     </ul>
                     <section class="ia-plano-actions">
-                        <button class="btn-iniciar-treino" onclick="location.href='/treinos/execucao?plano_id=<%= plano.id %>'"><i class="fas fa-play"></i> Iniciar Treino</button>
+                        <button class="btn-iniciar-treino" onclick="location.href='/treinos/execucao?plano_id=<%= plano.id %>'"><i class="fas fa-play"></i> <span data-i18n="treinos.start">Iniciar Treino</span></button>
                         <a href="/ai/chat" class="btn-pedir-ia"><i class="fas fa-robot"></i> Pedir novo treino à IA</a>
                     </section>
                 </section>
@@ -344,11 +347,13 @@
     const card = document.getElementById('checkinCard');
 
     function streakHtml(n) {
+        const t = window.__t || (k => k);
         if (n > 0) return `<span class="checkin-streak-badge"><i class="fas fa-fire"></i> ${n} dia${n > 1 ? 's' : ''} seguido${n > 1 ? 's' : ''}</span>`;
-        return `<span class="checkin-streak-zero">Comece sua sequência hoje</span>`;
+        return `<span class="checkin-streak-zero">${t('treinos.checkin.streak')}</span>`;
     }
 
     function renderCheckedIn(created_at, streak) {
+        const t = window.__t || (k => k);
         const hora = created_at
             ? new Date(created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
             : '';
@@ -356,7 +361,7 @@
             <section class="checkin-body">
                 <section class="checkin-icon checkin-icon--done"><i class="fas fa-check-circle"></i></section>
                 <section class="checkin-info">
-                    <h4 class="checkin-title">Presença registrada!</h4>
+                    <h4 class="checkin-title">${t('treinos.checkin.done')}</h4>
                     <p class="checkin-sub">Registrado hoje${hora ? ' às ' + hora : ''}</p>
                     ${streakHtml(streak)}
                 </section>
@@ -364,16 +369,17 @@
     }
 
     function renderPending(streak) {
+        const t = window.__t || (k => k);
         card.innerHTML = `
             <section class="checkin-body">
                 <section class="checkin-icon"><i class="fas fa-dumbbell"></i></section>
                 <section class="checkin-info">
-                    <h4 class="checkin-title">Registrar presença</h4>
-                    <p class="checkin-sub">Você ainda não registrou presença hoje</p>
+                    <h4 class="checkin-title">${t('treinos.checkin.title')}</h4>
+                    <p class="checkin-sub">${t('treinos.checkin.sub')}</p>
                     ${streakHtml(streak)}
                 </section>
             </section>
-            <button class="checkin-btn" id="btnCheckin"><i class="fas fa-check"></i> Registrar presença hoje</button>`;
+            <button class="checkin-btn" id="btnCheckin"><i class="fas fa-check"></i> ${t('treinos.checkin.btn')}</button>`;
 
         document.getElementById('btnCheckin').addEventListener('click', async () => {
             const btn = document.getElementById('btnCheckin');
@@ -386,7 +392,7 @@
                 renderCheckedIn(data.ok ? data.created_at : null, s.streak || 0);
             } catch {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-check"></i> Registrar presença hoje';
+                btn.innerHTML = `<i class="fas fa-check"></i> ${(window.__t || (k=>k))('treinos.checkin.btn')}`;
             }
         });
     }

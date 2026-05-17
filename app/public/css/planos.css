@@ -243,3 +243,15 @@ a {
     font-size: 0.8rem;
     font-weight: bold;
 }
+
+.plans-legal-note {
+    text-align: center;
+    font-size: 0.78rem;
+    color: #777;
+    margin: 1.5rem auto 2.5rem;
+    max-width: 700px;
+    padding: 0 1.2rem;
+    line-height: 1.65;
+}
+.plans-legal-note a { color: #FFD700; }
+.plans-legal-note .fa-info-circle { margin-right: 0.3rem; color: #FFD700; }

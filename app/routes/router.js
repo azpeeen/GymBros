@@ -9,6 +9,7 @@ const Fuse       = require('fuse.js');
 const { body, validationResult } = require('express-validator');
 const { enviarBoleto }   = require('../services/email');
 const { gerarBoletoPDF } = require('../services/pdf');
+const conquistas  = require('../services/conquistas');
 const db          = require('../config/db');
 const User        = require('../models/User');
 const Plan        = require('../models/Plan');
@@ -24,6 +25,25 @@ function safeJson(str, fallback) {
     try { return JSON.parse(str || 'null') ?? fallback; }
     catch { return fallback; }
 }
+
+// Adiciona colunas de perfil se ainda não existirem
+(async () => {
+    const cols = [
+        'ALTER TABLE user ADD COLUMN instagram_username VARCHAR(60) DEFAULT NULL',
+        'ALTER TABLE user ADD COLUMN username VARCHAR(30) DEFAULT NULL',
+        'ALTER TABLE user ADD COLUMN bio VARCHAR(150) DEFAULT NULL',
+        'ALTER TABLE user ADD COLUMN medalhas_destaque JSON DEFAULT NULL',
+    ];
+    for (const sql of cols) {
+        try { await db.execute(sql); }
+        catch (err) { if (err.errno !== 1060) console.error('[router] alter user:', err.message); }
+    }
+    try {
+        await db.execute('CREATE UNIQUE INDEX idx_username ON user(username)');
+    } catch (err) {
+        if (err.errno !== 1061) console.error('[router] idx_username:', err.message);
+    }
+})();
 
 // Cria tabela de check-ins manuais de treino (separada da checkin de academia)
 (async () => {
@@ -75,6 +95,86 @@ function safeJson(str, fallback) {
         `);
     } catch (err) {
         console.error('[router] initSessaoTables:', err.message);
+    }
+})();
+
+// Cria tabelas de conquistas e faz seed do catálogo
+(async () => {
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS conquistas (
+                id          INT AUTO_INCREMENT PRIMARY KEY,
+                slug        VARCHAR(80) NOT NULL UNIQUE,
+                nome        VARCHAR(100) NOT NULL,
+                descricao   VARCHAR(255),
+                categoria   ENUM('braco','perna','peito','costas','ombro','core','cardio','consistencia','ia') NOT NULL,
+                tier        ENUM('bronze','prata','ouro','platina','diamante') NOT NULL,
+                icone       VARCHAR(10),
+                meta_valor  DECIMAL(8,2),
+                meta_tipo   ENUM('peso','duracao','contagem','booleano') NOT NULL,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB
+        `);
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS usuario_conquistas (
+                id            INT AUTO_INCREMENT PRIMARY KEY,
+                user_id       INT UNSIGNED NOT NULL,
+                conquista_id  INT NOT NULL,
+                desbloqueada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_user_conquista (user_id, conquista_id),
+                CONSTRAINT fk_uc_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+                CONSTRAINT fk_uc_conquista FOREIGN KEY (conquista_id) REFERENCES conquistas(id)
+            ) ENGINE=InnoDB
+        `);
+        // Seed: insert only if table is empty (slug UNIQUE prevents duplicates)
+        await db.execute(`
+            INSERT IGNORE INTO conquistas (slug,nome,descricao,categoria,tier,icone,meta_valor,meta_tipo) VALUES
+            ('braco-bronze','Braço de Macarrão','Registrou 20kg em exercício de braço','braco','bronze','💪',20,'peso'),
+            ('braco-prata','Tá Aquecendo','Registrou 35kg em exercício de braço','braco','prata','💪',35,'peso'),
+            ('braco-ouro','Lenda do Curl','Registrou 50kg em exercício de braço','braco','ouro','💪',50,'peso'),
+            ('braco-platina','Braço de Ferro','Registrou 65kg em exercício de braço','braco','platina','💪',65,'peso'),
+            ('braco-diamante','Não É Photoshop','Registrou 80kg em exercício de braço','braco','diamante','💪',80,'peso'),
+            ('perna-bronze','Nunca Falta o Leg','Registrou 60kg em exercício de perna','perna','bronze','🦵',60,'peso'),
+            ('perna-prata','Agacha Que Dói','Registrou 100kg em exercício de perna','perna','prata','🦵',100,'peso'),
+            ('perna-ouro','Perna de Touro','Registrou 150kg em exercício de perna','perna','ouro','🦵',150,'peso'),
+            ('perna-platina','Perna de Concreto','Registrou 200kg em exercício de perna','perna','platina','🦵',200,'peso'),
+            ('perna-diamante','Humano? Duvido','Registrou 250kg em exercício de perna','perna','diamante','🦵',250,'peso'),
+            ('peito-bronze','Começando a Forma','Registrou 40kg em exercício de peito','peito','bronze','🏋️',40,'peso'),
+            ('peito-prata','Peito de Pombo','Registrou 60kg em exercício de peito','peito','prata','🏋️',60,'peso'),
+            ('peito-ouro','Supino Sagrado','Registrou 80kg em exercício de peito','peito','ouro','🏋️',80,'peso'),
+            ('peito-platina','Caixa Torácica de Aço','Registrou 100kg em exercício de peito','peito','platina','🏋️',100,'peso'),
+            ('peito-diamante','Arnold Sorriu','Registrou 120kg em exercício de peito','peito','diamante','🏋️',120,'peso'),
+            ('costas-bronze','Postura Corrigida','Registrou 40kg em exercício de costas','costas','bronze','🔙',40,'peso'),
+            ('costas-prata','Remada Iniciada','Registrou 60kg em exercício de costas','costas','prata','🔙',60,'peso'),
+            ('costas-ouro','Abrindo as Asas','Registrou 80kg em exercício de costas','costas','ouro','🔙',80,'peso'),
+            ('costas-platina','Remada Sagrada','Registrou 110kg em exercício de costas','costas','platina','🔙',110,'peso'),
+            ('costas-diamante','Largura Infinita','Registrou 140kg em exercício de costas','costas','diamante','🔙',140,'peso'),
+            ('ombro-bronze','Ombro Aquecido','Registrou 15kg em exercício de ombro','ombro','bronze','🏔️',15,'peso'),
+            ('ombro-prata','Deltoide Ativo','Registrou 25kg em exercício de ombro','ombro','prata','🏔️',25,'peso'),
+            ('ombro-ouro','Três Cabeças Acordadas','Registrou 40kg em exercício de ombro','ombro','ouro','🏔️',40,'peso'),
+            ('ombro-platina','Ombro de Titã','Registrou 55kg em exercício de ombro','ombro','platina','🏔️',55,'peso'),
+            ('ombro-diamante','Atlas Humano','Registrou 70kg em exercício de ombro','ombro','diamante','🏔️',70,'peso'),
+            ('core-bronze','Barriga Acordada','Registrou 10kg em exercício de core','core','bronze','🔥',10,'peso'),
+            ('core-prata','Core Ativado','Registrou 20kg em exercício de core','core','prata','🔥',20,'peso'),
+            ('core-ouro','Prancha de Aço','Registrou 30kg em exercício de core','core','ouro','🔥',30,'peso'),
+            ('core-platina','Abdômen Blindado','Registrou 45kg em exercício de core','core','platina','🔥',45,'peso'),
+            ('core-diamante','O Abdominal Não Mente','Registrou 60kg em exercício de core','core','diamante','🔥',60,'peso'),
+            ('cardio-bronze','Saiu do Sofá','Completou 30min de cardio','cardio','bronze','🏃',30,'duracao'),
+            ('cardio-prata','Corredor Nato','Completou 45min de cardio','cardio','prata','🏃',45,'duracao'),
+            ('cardio-ouro','Pulmão de Ferro','Completou 60min de cardio','cardio','ouro','🏃',60,'duracao'),
+            ('cardio-platina','Ultramaratonista','Completou 90min de cardio','cardio','platina','🏃',90,'duracao'),
+            ('cardio-diamante','Não Para Nunca','Completou 120min de cardio','cardio','diamante','🏃',120,'duracao'),
+            ('consist-bronze','Primeira Rep','Completou a primeira sessão de treino','consistencia','bronze','🏆',1,'contagem'),
+            ('consist-prata','Em Chamas','3 dias consecutivos de treino','consistencia','prata','🏆',3,'contagem'),
+            ('consist-ouro','Semana Completa','5 checkins na mesma semana','consistencia','ouro','🏆',5,'contagem'),
+            ('consist-platina','Inabalável','7 dias consecutivos de treino','consistencia','platina','🏆',7,'contagem'),
+            ('consist-diamante','Lenda do Gym','30 dias consecutivos de treino','consistencia','diamante','🏆',30,'contagem'),
+            ('ia-treino','Primeiro Protocolo','Gerou o primeiro plano de treino com IA','ia','bronze','🤖',1,'booleano'),
+            ('ia-dieta','Nutri Bro','Gerou o primeiro plano de dieta com IA','ia','bronze','🤖',1,'booleano'),
+            ('ia-avaliacao','Corpo Analisado','Realizou a primeira avaliação corporal','ia','prata','🤖',1,'booleano')
+        `);
+    } catch (err) {
+        console.error('[router] initConquistas:', err.message);
     }
 })();
 
@@ -448,25 +548,38 @@ router.get('/faq', (req, res) => res.render('pages/faq', { user: req.session.use
 
 // Área do Aluno (protegida — requer plano ativo)
 router.get('/area-aluno', requirePlano, async (req, res) => {
+    const uid = req.session.user.id;
     try {
-        const [rows] = await db.execute(
-            'SELECT last_imc_update, last_avaliacao_update, notification_interval_days FROM user WHERE id = ?',
-            [req.session.user.id]
-        );
-        const extra = rows[0] || {};
+        const [[extraRow], [[cqRow]], [[semanaRow]], ultimasConqRows] = await Promise.all([
+            db.execute('SELECT last_imc_update, last_avaliacao_update, notification_interval_days FROM user WHERE id = ?', [uid]),
+            db.execute('SELECT COUNT(*) as total FROM usuario_conquistas WHERE user_id = ?', [uid]),
+            db.execute('SELECT COUNT(*) as semana FROM treino_checkins WHERE user_id = ? AND YEARWEEK(created_at, 1) = YEARWEEK(NOW(), 1)', [uid]),
+            db.execute(`SELECT c.nome, c.icone, c.tier FROM usuario_conquistas uc JOIN conquistas c ON c.id = uc.conquista_id WHERE uc.user_id = ? ORDER BY uc.desbloqueada_em DESC LIMIT 2`, [uid]),
+        ]);
+        const extra          = extraRow[0] || {};
+        const totalConquistas   = cqRow?.total || 0;
+        const checkinsNaSemana  = semanaRow?.semana || 0;
+        const metaSemanal       = Math.min(Math.round((checkinsNaSemana / 5) * 100), 100);
+        const ultimasConquistas = ultimasConqRows[0] || [];
+
         res.render('pages/area-aluno', {
             user: { ...req.session.user, ...extra },
+            totalConquistas,
+            checkinsNaSemana,
+            metaSemanal,
+            ultimasConquistas,
             seo: {
                 title: 'Painel do Aluno — GymBros', canonical: '/area-aluno',
                 robots: 'noindex, nofollow', description: 'Painel do aluno GymBros.',
-            }
+            },
         });
     } catch (err) {
         console.error('[area-aluno]', err);
-        res.render('pages/area-aluno', { user: req.session.user, seo: {
-            title: 'Painel do Aluno — GymBros', canonical: '/area-aluno',
-            robots: 'noindex, nofollow', description: 'Painel do aluno GymBros.',
-        }});
+        res.render('pages/area-aluno', {
+            user: req.session.user,
+            totalConquistas: 0, checkinsNaSemana: 0, metaSemanal: 0, ultimasConquistas: [],
+            seo: { title: 'Painel do Aluno — GymBros', canonical: '/area-aluno', robots: 'noindex, nofollow', description: 'Painel do aluno GymBros.' },
+        });
     }
 });
 
@@ -609,7 +722,8 @@ router.post('/treinos/checkin', requireAuth, async (req, res) => {
             'SELECT created_at FROM treino_checkins WHERE id = ?',
             [result.insertId]
         );
-        return res.json({ ok: true, created_at: rows[0].created_at });
+        const novasConquistas = await conquistas.verificarConsistencia(userId).catch(() => []);
+        return res.json({ ok: true, created_at: rows[0].created_at, novasConquistas });
     } catch (err) {
         console.error('[checkin]', err.message);
         return res.status(500).json({ ok: false, erro: 'Erro ao registrar check-in.' });
@@ -834,7 +948,38 @@ router.post('/treinos/sessao/exercicio/concluir', requireAuth, async (req, res) 
                 concluido         = 1
         `, [sessao_id, exercise_query, series_realizadas || 0, carga_usada || null]);
 
-        return res.json({ ok: true });
+        // Verificar conquistas de peso/cardio
+        const novasConquistas = [];
+        try {
+            const [exRows] = await db.execute(
+                'SELECT body_part FROM exercises WHERE LOWER(name) = LOWER(?) LIMIT 1',
+                [exercise_query]
+            );
+            const bodyPart = exRows[0]?.body_part || null;
+            const pesoKg   = parseFloat(String(carga_usada || '').replace(/[^\d.]/g, '')) || 0;
+            if (bodyPart) {
+                if (bodyPart === 'cardio' && pesoKg > 0) {
+                    const nc = await conquistas.verificarCardio(userId, pesoKg);
+                    novasConquistas.push(...nc);
+                } else if (pesoKg > 0) {
+                    const nc = await conquistas.verificarPeso(userId, bodyPart, pesoKg);
+                    novasConquistas.push(...nc);
+                }
+            }
+        } catch (e) {
+            console.error('[sessao/exercicio/concluir] conquistas:', e.message);
+        }
+
+        let novasDetalhes = [];
+        if (novasConquistas.length) {
+            const placeholders = novasConquistas.map(() => '?').join(',');
+            const [detalhes] = await db.execute(
+                `SELECT slug, nome, tier, icone FROM conquistas WHERE slug IN (${placeholders})`,
+                novasConquistas
+            );
+            novasDetalhes = detalhes;
+        }
+        return res.json({ ok: true, novasConquistas: novasDetalhes });
     } catch (err) {
         console.error('[sessao/exercicio/concluir]', err.message);
         return res.status(500).json({ erro: 'Erro ao concluir exercício.' });
@@ -883,7 +1028,43 @@ router.post('/treinos/sessao/finalizar', requireAuth, async (req, res) => {
             await db.execute('INSERT INTO treino_checkins (user_id) VALUES (?)', [userId]);
         }
 
-        return res.json({ ok: true });
+        // Verificar conquistas: peso/cardio de todos os exercícios + consistência
+        const novasSlugs = [];
+        try {
+            const [exRows] = await db.execute(
+                `SELECT tse.carga_usada, e.body_part
+                 FROM treino_sessao_exercicio tse
+                 LEFT JOIN exercises e ON LOWER(e.name) = LOWER(tse.exercise_query)
+                 WHERE tse.sessao_id = ? AND tse.concluido = 1`,
+                [sessao_id]
+            );
+            for (const ex of exRows) {
+                const grupo  = ex.body_part;
+                const pesoKg = parseFloat(String(ex.carga_usada || '').replace(/[^\d.]/g, '')) || 0;
+                if (grupo && pesoKg > 0) {
+                    const nc = grupo === 'cardio'
+                        ? await conquistas.verificarCardio(userId, pesoKg)
+                        : await conquistas.verificarPeso(userId, grupo, pesoKg);
+                    novasSlugs.push(...nc);
+                }
+            }
+        } catch (e) {
+            console.error('[sessao/finalizar] peso:', e.message);
+        }
+        const ncConsist = await conquistas.verificarConsistencia(userId).catch(() => []);
+        novasSlugs.push(...ncConsist);
+
+        let novasConquistas = [];
+        if (novasSlugs.length) {
+            const placeholders = novasSlugs.map(() => '?').join(',');
+            const [detalhes] = await db.execute(
+                `SELECT slug, nome, tier, icone FROM conquistas WHERE slug IN (${placeholders})`,
+                novasSlugs
+            );
+            novasConquistas = detalhes;
+        }
+
+        return res.json({ ok: true, novasConquistas });
     } catch (err) {
         console.error('[sessao/finalizar]', err.message);
         return res.status(500).json({ erro: 'Erro ao finalizar sessão.' });
@@ -1108,25 +1289,24 @@ router.get('/ai/avaliacao', requirePlano, async (req, res) => {
     res.render('pages/ai-avaliacao', { user: req.session.user, avaliacoes });
 });
 
-// Atualizar dados pessoais (nome e e-mail)
+// Atualizar e-mail nas configurações
 router.post('/config/atualizar-dados', requireAuth,
   [
-    body('nome').trim().notEmpty().withMessage('Nome obrigatório.').isLength({ min: 3 }).withMessage('Nome muito curto.'),
     body('email').isEmail().withMessage('E-mail inválido.').normalizeEmail(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ erros: errors.array() });
 
-    const { nome, email, cep } = req.body;
+    const { email } = req.body;
     const user = req.session.user;
     try {
         const dup = await User.findByEmail(email);
         if (dup && dup.id !== user.id) return res.status(400).json({ erro: 'E-mail já cadastrado.' });
 
-        await User.update(user.id, { nome, email, cep: cep || user.cep });
-        req.session.user = { ...user, nome, email };
-        return res.json({ mensagem: 'Dados atualizados com sucesso!' });
+        await User.update(user.id, { email });
+        req.session.user = { ...user, email };
+        return res.json({ mensagem: 'E-mail atualizado com sucesso!' });
     } catch (err) {
         console.error('[config/atualizar-dados]', err);
         return res.status(500).json({ erro: 'Erro ao atualizar dados.' });
@@ -1239,6 +1419,170 @@ router.post('/imc-save', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('[imc-save]', err);
         return res.status(500).json({ erro: 'Erro ao salvar perfil.' });
+    }
+});
+
+// Conquistas do aluno
+router.get('/conquistas', requirePlano, async (req, res) => {
+    try {
+        const lista = await conquistas.getConquistasUsuario(req.session.user.id);
+        const totalDesbloqueadas = lista.filter(c => c.desbloqueada).length;
+        res.render('pages/conquistas', {
+            user: req.session.user,
+            lista,
+            totalDesbloqueadas,
+            total: lista.length,
+            seo: { title: 'Minhas Conquistas — GymBros', canonical: '/conquistas', robots: 'noindex, nofollow', description: 'Suas conquistas no GymBros.' },
+        });
+    } catch (err) {
+        console.error('[conquistas]', err.message);
+        res.redirect('/area-aluno');
+    }
+});
+
+// Editar perfil — GET
+router.get('/perfil/editar', requireAuth, async (req, res) => {
+    const uid = req.session.user.id;
+    try {
+        const [[usuario]] = await db.execute(
+            'SELECT nome, username, bio, instagram_username, profile_photo, medalhas_destaque FROM user WHERE id = ?',
+            [uid]
+        );
+        const [conquistasList] = await db.execute(
+            `SELECT c.slug, c.nome, c.icone, c.tier
+             FROM usuario_conquistas uc
+             JOIN conquistas c ON c.id = uc.conquista_id
+             WHERE uc.user_id = ?
+             ORDER BY c.tier DESC, c.nome ASC`,
+            [uid]
+        );
+        const medalhasDestaque = safeJson(usuario.medalhas_destaque, []);
+        res.render('pages/editar-perfil', {
+            user:           req.session.user,
+            usuario,
+            conquistas:     conquistasList,
+            medalhasDestaque,
+            query:          req.query,
+            seo: { title: 'Editar Perfil — GymBros', robots: 'noindex' },
+        });
+    } catch (err) {
+        console.error('[perfil/editar GET]', err.message);
+        res.redirect('/area-aluno');
+    }
+});
+
+// Editar perfil — POST
+router.post('/perfil/editar', requireAuth, photoUpload.single('foto'), async (req, res) => {
+    const uid = req.session.user.id;
+    const { nome, username, bio, instagram_username } = req.body;
+
+    if (username && !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+        return res.redirect('/perfil/editar?erro=username_invalido');
+    }
+
+    try {
+        if (username) {
+            const [[existing]] = await db.execute(
+                'SELECT id FROM user WHERE username = ? AND id != ?',
+                [username, uid]
+            );
+            if (existing) return res.redirect('/perfil/editar?erro=username_taken');
+        }
+
+        let medalhasArr = [];
+        const raw = req.body.medalhas_destaque;
+        if (raw) {
+            medalhasArr = (Array.isArray(raw) ? raw : [raw]).slice(0, 3);
+        }
+
+        const fields = {
+            nome:               nome?.trim() || req.session.user.nome,
+            username:           username?.trim() || null,
+            bio:                bio?.trim().slice(0, 150) || null,
+            instagram_username: instagram_username?.replace('@', '').trim() || null,
+            medalhas_destaque:  JSON.stringify(medalhasArr),
+        };
+
+        if (req.file) fields.profile_photo = req.file.path;
+
+        await User.update(uid, fields);
+        req.session.user = { ...req.session.user, ...fields };
+
+        const destino = username?.trim() || String(uid);
+        res.redirect(`/perfil/${destino}?salvo=1`);
+    } catch (err) {
+        console.error('[perfil/editar POST]', err.message);
+        res.redirect('/perfil/editar?erro=servidor');
+    }
+}, (err, _req, res, _next) => {
+    console.error('[perfil/editar upload]', err.message);
+    res.redirect('/perfil/editar?erro=foto_invalida');
+});
+
+// Perfil público — acessível sem login
+router.get('/perfil/:id', async (req, res) => {
+    try {
+        const param = req.params.id;
+        const isNumeric = /^\d+$/.test(param);
+        const [uRows] = await db.execute(
+            isNumeric
+                ? 'SELECT id, nome, username, bio, profile_photo, status, created_at, instagram_username FROM user WHERE id = ? AND status = "ativo"'
+                : 'SELECT id, nome, username, bio, profile_photo, status, created_at, instagram_username FROM user WHERE username = ? AND status = "ativo"',
+            [param]
+        );
+        if (!uRows.length) return res.status(404).render('pages/404', { user: req.session.user || null });
+        const u = uRows[0];
+
+        const lista       = await conquistas.getConquistasUsuario(u.id);
+        const desbloqueadas = lista.filter(c => c.desbloqueada);
+
+        const [[{ totalSessoes }]] = await db.execute(
+            'SELECT COUNT(*) as totalSessoes FROM treino_sessao WHERE user_id = ? AND status = "completo"',
+            [u.id]
+        );
+
+        const [checkinRows] = await db.execute(
+            `SELECT DATE(created_at) as dia FROM treino_checkins
+             WHERE user_id = ? GROUP BY DATE(created_at) ORDER BY dia DESC LIMIT 60`,
+            [u.id]
+        );
+        let streak = 0;
+        let diaAnterior = null;
+        for (const row of checkinRows) {
+            const dia = new Date(row.dia);
+            if (!diaAnterior) { streak = 1; }
+            else {
+                const diff = (diaAnterior - dia) / (1000 * 60 * 60 * 24);
+                if (diff === 1) streak++;
+                else break;
+            }
+            diaAnterior = dia;
+        }
+
+        const [conquistasHero] = await db.execute(
+            `SELECT c.slug, c.nome, c.tier, c.icone
+             FROM usuario_conquistas uc
+             JOIN conquistas c ON c.id = uc.conquista_id
+             WHERE uc.user_id = ?
+             ORDER BY uc.desbloqueada_em DESC LIMIT 3`,
+            [u.id]
+        );
+
+        const isProprioPerfilId = !!(req.session.user && String(req.session.user.id) === String(u.id));
+
+        res.render('pages/perfil-publico', {
+            user:              req.session.user || null,
+            perfil:            u,
+            conquistas:        desbloqueadas,
+            conquistasHero,
+            totalSessoes,
+            streak,
+            isProprioPerfilId,
+            seo: { title: `Perfil de ${u.nome} — GymBros`, canonical: `/perfil/${u.id}`, description: `Veja as conquistas de ${u.nome} no GymBros.` },
+        });
+    } catch (err) {
+        console.error('[perfil]', err.message);
+        res.status(500).redirect('/');
     }
 });
 

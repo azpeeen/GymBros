@@ -30,6 +30,7 @@ const dictionary = {
     'sidebar.ai':       { pt: 'Personal Trainer IA', en: 'AI Personal Trainer', es: 'Entrenador IA' },
     'sidebar.avaliacao':{ pt: 'Avaliação Corporal',  en: 'Body Assessment',   es: 'Evaluación Corporal' },
     'sidebar.imc':      { pt: 'Meu Perfil IMC',      en: 'My BMI Profile',    es: 'Mi Perfil IMC' },
+    'sidebar.conquistas': { pt: 'Conquistas',          en: 'Achievements',      es: 'Logros' },
     'sidebar.suporte':  { pt: 'Suporte',             en: 'Support',           es: 'Soporte' },
     'sidebar.role':     { pt: 'Aluno GymBros',       en: 'GymBros Member',    es: 'Miembro GymBros' },
 
@@ -330,7 +331,112 @@ const dictionary = {
     'plans.black.f4':   { pt: 'Análise avançada de evolução corporal', en: 'Advanced body progress analysis', es: 'Análisis avanzado de evolución corporal' },
     'plans.black.f5':   { pt: 'Suporte prioritário',             en: 'Priority support',              es: 'Soporte prioritario' },
     'plans.btn.subscribe': { pt: 'Assinar agora', en: 'Subscribe now', es: 'Suscribirse ahora' },
-    'plans.price.month':   { pt: '/mês',          en: '/month',        es: '/mes' }
+    'plans.price.month':   { pt: '/mês',          en: '/month',        es: '/mes' },
+
+    /* ── IA — disclaimer ─────────────────────────────── */
+    'ai.disclaimer.title': {
+        pt: 'Aviso importante sobre a IA',
+        en: 'Important notice about AI',
+        es: 'Aviso importante sobre la IA'
+    },
+    'ai.disclaimer.text': {
+        pt: 'As recomendações geradas pela IA têm caráter informativo e educacional. Elas não substituem a orientação de um profissional de saúde habilitado. Consulte sempre um especialista antes de iniciar qualquer programa de treino ou dieta.',
+        en: 'AI-generated recommendations are informational and educational in nature. They do not replace guidance from a licensed healthcare professional. Always consult a specialist before starting any workout or diet program.',
+        es: 'Las recomendaciones generadas por la IA son de carácter informativo y educacional. No sustituyen la orientación de un profesional de salud habilitado. Consulte siempre a un especialista antes de iniciar cualquier programa de entrenamiento o dieta.'
+    },
+
+    /* ── treinos ─────────────────────────────────────── */
+    'treinos.title':          { pt: 'Meus Treinos',              en: 'My Workouts',               es: 'Mis Entrenamientos' },
+    'treinos.subtitle':       { pt: 'Registre suas sessões e acompanhe seu progresso', en: 'Log your sessions and track your progress', es: 'Registra tus sesiones y sigue tu progreso' },
+    'treinos.checkin.done':   { pt: 'Presença registrada!',      en: 'Attendance logged!',         es: '¡Asistencia registrada!' },
+    'treinos.checkin.title':  { pt: 'Registrar presença',        en: 'Log attendance',            es: 'Registrar asistencia' },
+    'treinos.checkin.sub':    { pt: 'Você ainda não registrou presença hoje', en: 'You haven\'t logged attendance today', es: 'No has registrado asistencia hoy' },
+    'treinos.checkin.streak': { pt: 'Começa sua sequência hoje', en: 'Start your streak today',   es: 'Comienza tu racha hoy' },
+    'treinos.checkin.btn':    { pt: 'Registrar presença hoje',   en: 'Log attendance today',      es: 'Registrar asistencia hoy' },
+    'treinos.plans.title':    { pt: 'Seus Planos de Treino',     en: 'Your Workout Plans',        es: 'Tus Planes de Entrenamiento' },
+    'treinos.plans.new':      { pt: 'Novo treino',               en: 'New workout',               es: 'Nuevo entrenamiento' },
+    'treinos.start':          { pt: 'Iniciar treino',            en: 'Start workout',             es: 'Iniciar entrenamiento' },
+
+    /* ── dashboard ──────────────────────────────────── */
+    'dashboard.welcome':           { pt: 'Bem-vindo',                     en: 'Welcome',               es: 'Bienvenido' },
+    'dashboard.subtitle':          { pt: 'Acompanhe seu progresso, treinos e planos', en: 'Track your progress, workouts and plans', es: 'Sigue tu progreso, entrenamientos y planes' },
+    'dashboard.weekly':            { pt: 'Treinos esta semana',           en: 'Workouts this week',    es: 'Entrenamientos esta semana' },
+    'dashboard.achievements':      { pt: 'Conquistas',                   en: 'Achievements',          es: 'Logros' },
+    'dashboard.goal':              { pt: 'Meta semanal',                  en: 'Weekly goal',           es: 'Meta semanal' },
+    'dashboard.goal.title':        { pt: 'Meta Semanal',                  en: 'Weekly Goal',           es: 'Meta Semanal' },
+    'dashboard.recent':            { pt: 'Atividades Recentes',           en: 'Recent Activities',     es: 'Actividades Recientes' },
+    'dashboard.viewall':           { pt: 'Ver todos',                    en: 'View all',              es: 'Ver todos' },
+    'dashboard.streak':            { pt: 'Sequência atual',               en: 'Current streak',       es: 'Racha actual' },
+    'dashboard.days':              { pt: 'dias',                          en: 'days',                 es: 'días' },
+    'dashboard.monthly':           { pt: 'Treinos este mês',             en: 'Workouts this month',  es: 'Entrenamientos este mes' },
+    'dashboard.lastactivity':      { pt: 'Última atividade',             en: 'Last activity',        es: 'Última actividad' },
+    'dashboard.actions.treinos':   { pt: 'Ver planilha de treinos',       en: 'View workout plan',    es: 'Ver plan de entrenamiento' },
+    'dashboard.actions.evolucao':  { pt: 'Acompanhe seus resultados',    en: 'Track your results',   es: 'Sigue tus resultados' },
+
+    /* ── config ─────────────────────────────────────── */
+    'config.title':          { pt: 'Configurações',           en: 'Settings',                es: 'Configuración' },
+    'config.subtitle':       { pt: 'Gerencie seu perfil, segurança e preferências', en: 'Manage your profile, security and preferences', es: 'Gestiona tu perfil, seguridad y preferencias' },
+    'config.profile':        { pt: 'Perfil',                  en: 'Profile',                 es: 'Perfil' },
+    'config.security':       { pt: 'Segurança',               en: 'Security',                es: 'Seguridad' },
+    'config.prefs':          { pt: 'Preferências',            en: 'Preferences',             es: 'Preferencias' },
+    'config.notifications':  { pt: 'Notificações',            en: 'Notifications',           es: 'Notificaciones' },
+    'config.reminders':      { pt: 'Lembretes',               en: 'Reminders',               es: 'Recordatorios' },
+    'config.water':          { pt: 'Lembrete de água',        en: 'Water reminder',          es: 'Recordatorio de agua' },
+    'config.sleep':          { pt: 'Lembrete de sono',        en: 'Sleep reminder',          es: 'Recordatorio de sueño' },
+    'config.interval':       { pt: 'Intervalo de lembretes',  en: 'Reminder interval',       es: 'Intervalo de recordatorios' },
+    'config.save.changes':   { pt: 'Salvar alterações',       en: 'Save changes',            es: 'Guardar cambios' },
+    'config.save.photo':     { pt: 'Salvar foto',             en: 'Save photo',              es: 'Guardar foto' },
+    'config.change.pass':    { pt: 'Alterar senha',           en: 'Change password',         es: 'Cambiar contraseña' },
+    'config.danger':         { pt: 'Zona de perigo',          en: 'Danger zone',             es: 'Zona de peligro' },
+    'config.logout':         { pt: 'Sair da conta',           en: 'Log out',                 es: 'Cerrar sesión' },
+    'config.save.btn':       { pt: 'Salvar',                  en: 'Save',                    es: 'Guardar' },
+    'config.save.reminders': { pt: 'Salvar lembretes',        en: 'Save reminders',          es: 'Guardar recordatorios' },
+
+    /* ── chat IA ─────────────────────────────────────── */
+    'chat.title':         { pt: 'Personal Trainer IA',     en: 'AI Personal Trainer',     es: 'Entrenador Personal IA' },
+    'chat.subtitle':      { pt: 'Tire suas dúvidas sobre treinos, exercícios, nutrição e muito mais', en: 'Get answers about workouts, exercises, nutrition and more', es: 'Resuelve tus dudas sobre entrenamientos, ejercicios, nutrición y más' },
+    'chat.placeholder':   { pt: 'Digite sua mensagem...', en: 'Type your message...',     es: 'Escribe tu mensaje...' },
+    'chat.new':           { pt: 'Nova conversa',          en: 'New conversation',         es: 'Nueva conversación' },
+    'chat.conversations': { pt: 'Conversas',              en: 'Conversations',            es: 'Conversaciones' },
+    'chat.send':          { pt: 'Enviar',                 en: 'Send',                     es: 'Enviar' },
+
+    /* ── avaliação corporal ──────────────────────────── */
+    'body.title':        { pt: 'Avaliação Corporal com IA',  en: 'AI Body Assessment',  es: 'Evaluación Corporal con IA' },
+    'body.subtitle':     { pt: 'Envie suas fotos e receba uma análise estimativa de composição corporal', en: 'Send your photos and receive an estimated body composition analysis', es: 'Envía tus fotos y recibe un análisis estimativo de composición corporal' },
+    'body.photos.title': { pt: 'Enviar Fotos',               en: 'Upload Photos',       es: 'Subir Fotos' },
+    'body.photos.desc':  { pt: 'Foto frontal obrigatória — lateral e posterior opcionais', en: 'Front photo required — side and back optional', es: 'Foto frontal obligatoria — lateral y posterior opcionales' },
+    'body.photo.front':  { pt: 'Foto Frontal',               en: 'Front Photo',         es: 'Foto Frontal' },
+    'body.photo.side':   { pt: 'Foto Lateral',               en: 'Side Photo',          es: 'Foto Lateral' },
+    'body.photo.back':   { pt: 'Foto Posterior',             en: 'Back Photo',          es: 'Foto Posterior' },
+    'body.required':     { pt: '* obrigatório',              en: '* required',          es: '* obligatorio' },
+    'body.optional':     { pt: 'opcional',                   en: 'optional',            es: 'opcional' },
+    'body.analyze':      { pt: 'Analisar',                   en: 'Analyze',             es: 'Analizar' },
+
+    /* ── meu plano ───────────────────────────────────── */
+    'myplan.title':    { pt: 'Meu Plano',       en: 'My Plan',        es: 'Mi Plan' },
+    'myplan.subtitle': { pt: 'Gerencie sua assinatura, veja benefícios e compare com outros planos.', en: 'Manage your subscription, view benefits and compare plans.', es: 'Gestiona tu suscripción, ve beneficios y compara planes.' },
+    'myplan.active':   { pt: 'Plano ativo',     en: 'Active plan',    es: 'Plan activo' },
+    'myplan.others':   { pt: 'Outros Planos Disponíveis', en: 'Other Available Plans', es: 'Otros Planes Disponibles' },
+    'myplan.renew':    { pt: 'Seu plano renova automaticamente na data acima.', en: 'Your plan renews automatically on the date above.', es: 'Tu plan se renueva automáticamente en la fecha indicada.' },
+    'myplan.none':     { pt: 'Sem plano ativo', en: 'No active plan', es: 'Sin plan activo' },
+
+    /* ── suporte ─────────────────────────────────────── */
+    'support.title':     { pt: 'Central de Suporte',   en: 'Support Center',    es: 'Centro de Soporte' },
+    'support.subtitle':  { pt: 'Abra chamados e acompanhe o status do seu atendimento', en: 'Open tickets and track your support status', es: 'Abre tickets y sigue el estado de tu atención' },
+    'support.new':       { pt: 'Abrir Novo Chamado',   en: 'Open New Ticket',   es: 'Abrir Nuevo Ticket' },
+    'support.subject':   { pt: 'Assunto *',            en: 'Subject *',         es: 'Asunto *' },
+    'support.send':      { pt: 'Enviar Chamado',       en: 'Submit Ticket',     es: 'Enviar Ticket' },
+    'support.mytickets': { pt: 'Meus Chamados',        en: 'My Tickets',        es: 'Mis Tickets' },
+    'support.desc':      { pt: 'Descrição *',          en: 'Description *',     es: 'Descripción *' },
+
+    /* ── perfil IMC ──────────────────────────────────── */
+    'imc.title':       { pt: 'Meu Perfil IMC',  en: 'My BMI Profile', es: 'Mi Perfil IMC' },
+    'imc.subtitle':    { pt: 'Preencha seu perfil para receber orientações personalizadas do GymBot', en: 'Fill in your profile to receive personalized guidance from GymBot', es: 'Completa tu perfil para recibir orientaciones personalizadas del GymBot' },
+    'imc.weight':      { pt: 'Peso (kg)',        en: 'Weight (kg)',    es: 'Peso (kg)' },
+    'imc.height':      { pt: 'Altura (cm)',      en: 'Height (cm)',    es: 'Altura (cm)' },
+    'imc.save':        { pt: 'Salvar Perfil',    en: 'Save Profile',   es: 'Guardar Perfil' },
+    'imc.step.next':   { pt: 'Avançar',          en: 'Next',           es: 'Siguiente' },
+    'imc.step.back':   { pt: 'Voltar',           en: 'Back',           es: 'Atrás' }
 };
 
 let currentLang = localStorage.getItem('gymbros_lang') || getCookieLang() || 'pt';
@@ -392,6 +498,9 @@ window.changeLang        = switchLanguage;
 window.switchLanguage    = switchLanguage;
 window.translatePage     = translatePage;
 window.applyDictionary   = applyDictionary;
+window.__t = function(key) {
+    return (dictionary[key] && dictionary[key][currentLang]) || key;
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     setCookieLang(currentLang);
