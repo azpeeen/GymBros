@@ -275,3 +275,35 @@ body.light-mode .evo-table tr:hover td { background: rgba(0,0,0,0.04); }
 body.light-mode .evo-section-header h2 i { color: #C98B1D; }
 /* Ícones de entrada no timeline: mantêm cor original */
 body.light-mode .evo-entry-dot i          { color: inherit; }
+
+/* ── Gráficos de carga e volume ── */
+#secGraficoCarga .evo-chart-wrap,
+#secGraficoVolume .evo-chart-wrap {
+    height: 240px;
+}
+
+.evo-exercicio-select {
+    background: #111;
+    border: 1px solid #2E2E2E;
+    color: #F0F0F0;
+    padding: 9px 13px;
+    border-radius: 8px;
+    font-size: .875rem;
+    font-family: inherit;
+    width: 100%;
+    max-width: 420px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color .2s;
+    margin-bottom: 16px;
+    display: block;
+}
+.evo-exercicio-select:focus { border-color: #FFD700; }
+.evo-exercicio-select option { background: #1A1A1A; }
+
+body.light-mode .evo-exercicio-select {
+    background: #EDEBE8;
+    border-color: #D0CDC9;
+    color: #1A1A1A;
+}
+body.light-mode .evo-exercicio-select option { background: #F5F4F1; }

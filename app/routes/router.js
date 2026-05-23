@@ -10,6 +10,7 @@ const { body, validationResult } = require('express-validator');
 const { enviarBoleto }   = require('../services/email');
 const { gerarBoletoPDF } = require('../services/pdf');
 const conquistas  = require('../services/conquistas');
+const { calcularMetas } = require('../services/nutricao');
 const db          = require('../config/db');
 const User        = require('../models/User');
 const Plan        = require('../models/Plan');
@@ -25,6 +26,18 @@ function safeJson(str, fallback) {
     try { return JSON.parse(str || 'null') ?? fallback; }
     catch { return fallback; }
 }
+
+// Adiciona colunas de tradução de exercícios se ainda não existirem
+(async () => {
+    const cols = [
+        'ALTER TABLE exercises ADD COLUMN name_pt VARCHAR(255) DEFAULT NULL',
+        'ALTER TABLE exercises ADD COLUMN name_es VARCHAR(255) DEFAULT NULL',
+    ];
+    for (const sql of cols) {
+        try { await db.execute(sql); }
+        catch (err) { if (err.errno !== 1060) console.error('[router] alter exercises:', err.message); }
+    }
+})();
 
 // Adiciona colunas de perfil se ainda não existirem
 (async () => {
@@ -178,6 +191,57 @@ function safeJson(str, fallback) {
     }
 })();
 
+// Cria tabela de registro nutricional diário
+(async () => {
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS nutrition_log (
+                id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id       INT UNSIGNED NOT NULL,
+                descricao     VARCHAR(255) NOT NULL,
+                kcal          SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                proteina      DECIMAL(5,1) NOT NULL DEFAULT 0,
+                carboidrato   DECIMAL(5,1) NOT NULL DEFAULT 0,
+                gordura       DECIMAL(5,1) NOT NULL DEFAULT 0,
+                foto_url      VARCHAR(500) DEFAULT NULL,
+                refeicao      ENUM('cafe','lanche_manha','almoco','lanche_tarde','jantar','ceia','agua') NOT NULL DEFAULT 'almoco',
+                registrado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                INDEX idx_nl_user_data (user_id, registrado_em),
+                CONSTRAINT fk_nl_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB
+        `);
+    } catch (err) {
+        console.error('[router] initNutritionLog:', err.message);
+    }
+})();
+
+// Adiciona colunas extras à nutrition_log se ainda não existirem
+(async () => {
+    const cols = [
+        'ALTER TABLE nutrition_log ADD COLUMN proteina_g DECIMAL(6,1) NOT NULL DEFAULT 0 AFTER kcal',
+        'ALTER TABLE nutrition_log ADD COLUMN carbs_g DECIMAL(6,1) NOT NULL DEFAULT 0 AFTER proteina_g',
+        'ALTER TABLE nutrition_log ADD COLUMN gordura_g DECIMAL(6,1) NOT NULL DEFAULT 0 AFTER carbs_g',
+        'ALTER TABLE nutrition_log ADD COLUMN fibra_g DECIMAL(6,1) NOT NULL DEFAULT 0 AFTER gordura_g',
+        'ALTER TABLE nutrition_log ADD COLUMN refeicao_tipo ENUM(\'cafe\',\'almoco\',\'jantar\',\'lanche\',\'outro\') NOT NULL DEFAULT \'outro\' AFTER refeicao',
+        'ALTER TABLE nutrition_log ADD COLUMN foto_url VARCHAR(500) DEFAULT NULL',
+        'ALTER TABLE nutrition_log ADD COLUMN data DATE GENERATED ALWAYS AS (DATE(registrado_em)) STORED',
+        'ALTER TABLE nutrition_log ADD INDEX idx_nl_user_data2 (user_id, data)',
+    ];
+    for (const sql of cols) {
+        try { await db.execute(sql); }
+        catch (err) { if (err.errno !== 1060 && err.errno !== 1061 && err.errno !== 1054) console.error('[nutrition_log alter]', err.message); }
+    }
+})();
+(async () => {
+    try { await db.execute("ALTER TABLE `user` ADD COLUMN nutricao_objetivo ENUM('cutting','manutencao','bulking') DEFAULT NULL"); }
+    catch (err) { if (err.errno !== 1060) console.error('[router] nutricao_objetivo:', err.message); }
+})();
+(async () => {
+    try { await db.execute('ALTER TABLE nutrition_log ADD COLUMN horario TIME DEFAULT NULL'); }
+    catch (err) { if (err.errno !== 1060) console.error('[router] nutrition_log horario:', err.message); }
+})();
+
 // ── Multer: upload de foto de perfil ──────────────────────────────────────────
 const photoStorage = new CloudinaryStorage({
     cloudinary,
@@ -191,6 +255,27 @@ const photoStorage = new CloudinaryStorage({
 const photoUpload = multer({
     storage: photoStorage,
     limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (!['image/jpeg','image/png','image/webp'].includes(file.mimetype)) {
+            return cb(new Error('Formato inválido. Use JPEG, PNG ou WebP.'));
+        }
+        cb(null, true);
+    },
+});
+
+// ── Multer: upload de foto de alimento (Groq Vision) ─────────────────────────
+const fotoNutricaoStorage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+        folder:          'gymbros/nutricao',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation:  [{ width: 800, height: 800, crop: 'limit', quality: 80 }],
+        public_id:       (req) => `nutricao_${req.session.user?.id || 'anon'}_${Date.now()}`,
+    },
+});
+const fotoNutricaoUpload = multer({
+    storage: fotoNutricaoStorage,
+    limits: { fileSize: 8 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (!['image/jpeg','image/png','image/webp'].includes(file.mimetype)) {
             return cb(new Error('Formato inválido. Use JPEG, PNG ou WebP.'));
@@ -1161,6 +1246,37 @@ router.get('/evolucao', requirePlano, async (req, res) => {
         contPorDia[d.getDay()] += Number(c.total) || 0;
     });
 
+    let exerciciosExecutados = [], volumeSemanal = [];
+    try {
+        [exerciciosExecutados] = await db.execute(`
+            SELECT DISTINCT e.id, e.name, e.name_pt, e.name_es, e.body_part
+            FROM treino_sessao_exercicio tse
+            JOIN treino_sessao ts ON ts.id = tse.sessao_id
+            JOIN exercises e ON LOWER(e.name) = LOWER(tse.exercise_query)
+            WHERE ts.user_id = ? AND ts.status = 'completo'
+              AND tse.carga_usada IS NOT NULL AND tse.carga_usada != ''
+              AND (tse.carga_usada + 0) > 0
+            ORDER BY e.name ASC
+        `, [uid]);
+    } catch (err) { console.error('[evolucao/exercicios]', err); }
+
+    try {
+        [volumeSemanal] = await db.execute(`
+            SELECT
+              YEARWEEK(ts.finalizado_em, 1) AS semana,
+              MIN(DATE(ts.finalizado_em)) AS inicio_semana,
+              COUNT(DISTINCT ts.id) AS sessoes,
+              COUNT(tse.id) AS series_totais
+            FROM treino_sessao ts
+            JOIN treino_sessao_exercicio tse ON tse.sessao_id = ts.id
+            WHERE ts.user_id = ?
+              AND ts.status = 'completo'
+              AND ts.finalizado_em >= DATE_SUB(NOW(), INTERVAL 8 WEEK)
+            GROUP BY YEARWEEK(ts.finalizado_em, 1)
+            ORDER BY semana ASC
+        `, [uid]);
+    } catch (err) { console.error('[evolucao/volume]', err); }
+
     res.render('pages/evolucao', {
         user: req.session.user,
         checkins,
@@ -1168,8 +1284,37 @@ router.get('/evolucao', requirePlano, async (req, res) => {
         measurements,
         graficoLabels: JSON.stringify(diasSemana),
         graficoData:   JSON.stringify(contPorDia),
+        exerciciosExecutados,
+        volumeSemanal,
+        locale: req.locale || 'pt',
         seo: { title: 'Minha Evolução — GymBros', canonical: '/evolucao', robots: 'noindex, nofollow', description: 'Acompanhe sua evolução física no GymBros.' },
     });
+});
+
+// GET /api/evolucao/exercicio/:id — histórico de carga de um exercício
+router.get('/api/evolucao/exercicio/:id', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    try {
+        const [historico] = await db.execute(`
+            SELECT
+              DATE(ts.finalizado_em) AS data,
+              MAX(tse.carga_usada + 0) AS carga_maxima
+            FROM treino_sessao ts
+            JOIN treino_sessao_exercicio tse ON tse.sessao_id = ts.id
+            JOIN exercises e ON LOWER(e.name) = LOWER(tse.exercise_query)
+            WHERE ts.user_id = ?
+              AND e.id = ?
+              AND ts.status = 'completo'
+              AND (tse.carga_usada + 0) > 0
+            GROUP BY DATE(ts.finalizado_em)
+            ORDER BY data ASC
+            LIMIT 30
+        `, [userId, req.params.id]);
+        res.json(historico);
+    } catch (err) {
+        console.error('[api/evolucao/exercicio]', err);
+        res.status(500).json({ erro: 'Erro ao buscar histórico.' });
+    }
 });
 
 // Meu Plano
@@ -1904,6 +2049,193 @@ router.get('/js/carrossel.js', (req, res) => res.sendFile(path.join(__dirname, '
 router.get('/js/header.js', (req, res) => res.sendFile(path.join(__dirname, '../public/js/header.js')));
 router.get('/js/forms.js', (req, res) => res.sendFile(path.join(__dirname, '../public/js/forms.js')));
 router.get('/js/area-aluno.js', (req, res) => res.sendFile(path.join(__dirname, '../public/js/area-aluno.js')));
+
+// ====================
+// NUTRIÇÃO
+// ====================
+
+router.get('/nutricao', requirePlano, async (req, res) => {
+    const uid = req.session.user.id;
+    let imc = null;
+    let metas = { kcal: 2000, proteina: 120, carbs: 250, gordura: 65, fibra: 25, agua: 2500, calculado: false };
+    let registrosHoje = [], aderenciaSemanal = [];
+    let objetivoAtual = null;
+
+    try {
+        const [imcRows] = await db.execute(
+            'SELECT * FROM imc_profile WHERE user_id = ? ORDER BY id DESC LIMIT 1', [uid]
+        );
+        imc = imcRows[0] || null;
+    } catch (err) { console.error('[nutricao/imc]', err); }
+
+    try {
+        const [[userRow]] = await db.execute(
+            'SELECT nutricao_objetivo FROM `user` WHERE id = ?', [uid]
+        );
+        objetivoAtual = userRow?.nutricao_objetivo || null;
+    } catch (_) {}
+
+    const objOverride = objetivoAtual === 'cutting' ? 'cutting'
+        : objetivoAtual === 'bulking' ? 'bulking'
+        : objetivoAtual === 'manutencao' ? 'manutencao'
+        : null;
+    const imcComObjetivo = imc ? { ...imc, objetivo: objOverride || imc.objetivo || '' } : null;
+    if (imcComObjetivo) metas = calcularMetas(imcComObjetivo);
+
+    try {
+        [registrosHoje] = await db.execute(
+            `SELECT * FROM nutrition_log
+             WHERE user_id = ? AND DATE(registrado_em) = CURDATE()
+               AND refeicao != 'agua'
+             ORDER BY registrado_em ASC`,
+            [uid]
+        );
+    } catch (err) { console.error('[nutricao/logs]', err); }
+
+    try {
+        [aderenciaSemanal] = await db.execute(
+            `SELECT
+                d.data,
+                COALESCE(SUM(n.kcal), 0)       AS total_kcal,
+                COALESCE(SUM(n.proteina_g), 0) AS total_prot
+             FROM (
+                SELECT CURDATE() - INTERVAL seq DAY AS data
+                FROM (SELECT 0 seq UNION SELECT 1 UNION SELECT 2 UNION SELECT 3
+                      UNION SELECT 4 UNION SELECT 5 UNION SELECT 6) s
+             ) d
+             LEFT JOIN nutrition_log n ON n.user_id = ? AND DATE(n.registrado_em) = d.data AND n.refeicao != 'agua'
+             GROUP BY d.data ORDER BY d.data ASC`,
+            [uid]
+        );
+    } catch (err) { console.error('[nutricao/aderencia]', err); }
+
+    const totaisHoje = registrosHoje.reduce((acc, r) => ({
+        kcal:     acc.kcal     + (Number(r.kcal)       || 0),
+        proteina: acc.proteina + (Number(r.proteina_g) || 0),
+        carbs:    acc.carbs    + (Number(r.carbs_g)    || 0),
+        gordura:  acc.gordura  + (Number(r.gordura_g)  || 0),
+        fibra:    acc.fibra    + (Number(r.fibra_g)    || 0),
+    }), { kcal: 0, proteina: 0, carbs: 0, gordura: 0, fibra: 0 });
+
+    const obj = objOverride || (imc?.objetivo || '').toLowerCase();
+    let objetivoLabel = 'Manutenção';
+    if (obj === 'cutting' || obj.includes('perder') || obj.includes('emagrecer') || obj.includes('cutting') || obj.includes('definir')) objetivoLabel = 'Cutting';
+    else if (obj === 'bulking' || obj.includes('ganhar') || obj.includes('massa') || obj.includes('bulking') || obj.includes('hipertrofia')) objetivoLabel = 'Bulking';
+
+    res.render('pages/nutricao', {
+        user: req.session.user,
+        imc,
+        metas,
+        registrosHoje,
+        totaisHoje,
+        aderenciaSemanal,
+        objetivoLabel,
+        objetivoAtual: objetivoAtual || 'manutencao',
+        seo: { title: 'Nutrição — GymBros', canonical: '/nutricao', robots: 'noindex, nofollow', description: 'Acompanhe sua nutrição diária no GymBros.' },
+    });
+});
+
+router.post('/api/nutricao/objetivo', requirePlano, async (req, res) => {
+    const uid = req.session.user.id;
+    const { objetivo } = req.body;
+    const valid = ['cutting', 'manutencao', 'bulking'];
+    if (!valid.includes(objetivo)) return res.status(400).json({ erro: 'Objetivo inválido.' });
+    try {
+        await db.execute('UPDATE `user` SET nutricao_objetivo = ? WHERE id = ?', [objetivo, uid]);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[api/nutricao/objetivo]', err);
+        res.status(500).json({ erro: 'Erro ao salvar objetivo.' });
+    }
+});
+
+router.post('/api/nutricao/registrar', requirePlano, async (req, res) => {
+    const uid = req.session.user.id;
+    const { refeicao, refeicao_tipo, kcal, proteina_g, carbs_g, gordura_g, fibra_g, foto_url } = req.body;
+
+    if (!refeicao || kcal === undefined || kcal === null || kcal === '') {
+        return res.status(400).json({ erro: 'Nome da refeição e calorias são obrigatórios.' });
+    }
+
+    const tiposValidos = ['cafe', 'almoco', 'jantar', 'lanche', 'outro'];
+    const tipo = tiposValidos.includes(refeicao_tipo) ? refeicao_tipo : 'outro';
+
+    try {
+        const [result] = await db.execute(
+            `INSERT INTO nutrition_log (user_id, refeicao, refeicao_tipo, kcal, proteina_g, carbs_g, gordura_g, fibra_g, foto_url, horario)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, TIME(NOW()))`,
+            [uid, String(refeicao).trim().slice(0, 255), tipo,
+             Math.round(Number(kcal) || 0),
+             Number(proteina_g) || 0, Number(carbs_g) || 0,
+             Number(gordura_g) || 0, Number(fibra_g) || 0,
+             foto_url || null]
+        );
+        const [[novoLog]] = await db.execute('SELECT * FROM nutrition_log WHERE id = ?', [result.insertId]);
+        res.json({ ok: true, log: novoLog });
+    } catch (err) {
+        console.error('[api/nutricao/registrar]', err);
+        res.status(500).json({ erro: 'Erro ao registrar alimento.' });
+    }
+});
+
+router.post('/api/nutricao/foto', requirePlano, fotoNutricaoUpload.single('foto'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada.' });
+
+    const fotoUrl = req.file.path || req.file.secure_url;
+    const fallback = { refeicao: 'Refeição', kcal: 300, proteina_g: 20, carbs_g: 40, gordura_g: 10, fibra_g: 3, observacao: '' };
+    const pesoG = Number(req.body?.peso_g) || 0;
+    const pesoTexto = pesoG > 0
+        ? `A porção pesa aproximadamente ${pesoG}g. Use este peso para calcular os macros proporcionalmente.`
+        : 'Estime a porção visual.';
+
+    try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+            body: JSON.stringify({
+                model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: `Analise esta foto de refeição. ${pesoTexto}\nRetorne APENAS um JSON válido, sem markdown:\n{"refeicao":"nome identificado","kcal":número inteiro,"proteina_g":decimal,"carbs_g":decimal,"gordura_g":decimal,"fibra_g":decimal,"observacao":"nota breve"}\nSeja conservador e realista.`,
+                        },
+                        { type: 'image_url', image_url: { url: fotoUrl } },
+                    ],
+                }],
+                temperature: 0.3,
+                max_tokens: 256,
+            }),
+        });
+
+        const groqData = await response.json();
+        const raw = groqData.choices?.[0]?.message?.content?.trim() || '';
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        let analise;
+        try { analise = JSON.parse(cleaned); } catch { analise = fallback; }
+
+        res.json({ ok: true, fotoUrl, analise });
+    } catch (err) {
+        console.error('[api/nutricao/foto]', err);
+        res.json({ ok: true, fotoUrl, analise: fallback });
+    }
+});
+
+router.delete('/api/nutricao/:id', requirePlano, async (req, res) => {
+    const uid = req.session.user.id;
+    try {
+        const [result] = await db.execute(
+            'DELETE FROM nutrition_log WHERE id = ? AND user_id = ?',
+            [req.params.id, uid]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ erro: 'Registro não encontrado.' });
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[api/nutricao/delete]', err);
+        res.status(500).json({ erro: 'Erro ao excluir registro.' });
+    }
+});
 
 // ====================
 // TROCA DE IDIOMA

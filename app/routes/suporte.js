@@ -43,7 +43,10 @@ router.post('/tickets',
             createdAt: new Date().toISOString(),
         });
 
-        res.status(201).json({ mensagem: 'Chamado aberto com sucesso!', ticketId });
+        const [[novoTicket]] = await db.execute(
+            'SELECT * FROM support_ticket WHERE id = ?', [ticketId]
+        );
+        res.status(201).json({ mensagem: 'Chamado aberto com sucesso!', ticket: novoTicket });
     } catch (err) {
         console.error('[suporte/tickets POST]', err);
         res.status(500).json({ erro: 'Erro ao abrir chamado.' });

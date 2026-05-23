@@ -7,6 +7,7 @@ const multer           = require('multer');
 const { File }         = require('buffer');
 const requirePlanLevel = require('../middleware/requirePlanLevel');
 const conquistas       = require('../services/conquistas');
+const { calcularMetas } = require('../services/nutricao');
 const db               = require('../config/db');
 
 // Multer para upload de áudio (10 MB, formatos permitidos)
@@ -215,6 +216,34 @@ async function buildSystemPrompt(user, exerciseBlock, existingPlanNames = [], co
     }
     const planNomes = workoutPlans.map(r => r.nome);
 
+    let nutriBloco = '';
+    try {
+        const [[userRow]] = await db.execute(
+            'SELECT nutricao_objetivo FROM `user` WHERE id = ?', [user.id]
+        );
+        const objNutri = userRow?.nutricao_objetivo || null;
+        const [totaisRows] = await db.execute(
+            `SELECT COALESCE(SUM(kcal),0) AS kcal, COALESCE(SUM(proteina_g),0) AS proteina,
+                    COALESCE(SUM(carbs_g),0) AS carbs, COALESCE(SUM(gordura_g),0) AS gordura
+             FROM nutrition_log WHERE user_id = ? AND DATE(registrado_em) = CURDATE()
+             AND refeicao != 'agua'`,
+            [user.id]
+        );
+        const tot = totaisRows[0] || {};
+        const imcParaMetas = user.imc
+            ? { ...user.imc, objetivo: objNutri || user.imc.objetivo || '' }
+            : null;
+        const metas = calcularMetas(imcParaMetas);
+        const objLabel = objNutri === 'cutting' ? 'Cutting' : objNutri === 'bulking' ? 'Bulking' : 'Manutenção';
+        const kcalConsumido = Math.round(tot.kcal || 0);
+        const saldo = kcalConsumido - metas.kcal;
+        nutriBloco = `\n\nNutrição hoje (${new Date().toLocaleDateString('pt-BR')}):
+Objetivo nutricional: ${objLabel}. Metas: ${metas.kcal} kcal · ${metas.proteina}g prot · ${metas.carbs}g carbs · ${metas.gordura}g gord.
+Consumido até agora: ${kcalConsumido} kcal · ${parseFloat(tot.proteina||0).toFixed(1)}g prot · ${parseFloat(tot.carbs||0).toFixed(1)}g carbs · ${parseFloat(tot.gordura||0).toFixed(1)}g gord.
+Saldo calórico: ${saldo >= 0 ? '+' : ''}${saldo} kcal (${kcalConsumido < metas.kcal ? 'abaixo da meta' : 'acima da meta'}).
+Use estes dados para conselhos nutricionais contextualizados quando o usuário perguntar sobre alimentação.`;
+    } catch (_) {}
+
     const imc = user.imc;
     const aval = user.avaliacaoCorporal;
 
@@ -259,6 +288,7 @@ Nomenclatura obrigatória dos planos: nomeie sempre como "Treino A — [tipo]", 
         if (planNomes.length > 0) {
             prompt += `\n\nPlanos de treino já salvos: ${planNomes.join(', ')}. Use a próxima letra disponível na sequência alfabética.`;
         }
+        if (nutriBloco) prompt += nutriBloco;
         return prompt;
     }
 
@@ -333,6 +363,7 @@ Nomenclatura obrigatória dos planos: nomeie sempre como "Treino A — [tipo]", 
     if (planNomes.length > 0) {
         prompt += `\n\nPlanos de treino já salvos: ${planNomes.join(', ')}. Use a próxima letra disponível na sequência alfabética.`;
     }
+    if (nutriBloco) prompt += nutriBloco;
 
     return prompt;
 }
