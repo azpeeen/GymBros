@@ -25,6 +25,7 @@ const dictionary = {
     'sidebar.painel':   { pt: 'Painel',              en: 'Dashboard',         es: 'Panel' },
     'sidebar.treinos':  { pt: 'Meus Treinos',        en: 'My Workouts',       es: 'Mis Entrenamientos' },
     'sidebar.evolucao': { pt: 'Evolução',            en: 'Progress',          es: 'Progreso' },
+    'sidebar.nutricao': { pt: 'Nutrição',            en: 'Nutrition',         es: 'Nutrición' },
     'sidebar.plano':    { pt: 'Meu Plano',           en: 'My Plan',           es: 'Mi Plan' },
     'sidebar.config':   { pt: 'Configurações',       en: 'Settings',          es: 'Configuración' },
     'sidebar.ai':       { pt: 'Personal Trainer IA', en: 'AI Personal Trainer', es: 'Entrenador IA' },

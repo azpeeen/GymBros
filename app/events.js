@@ -23,11 +23,12 @@ function broadcast(type, data) {
 const ticketClients = new Map(); // ticketId → Set<res>
 
 function addTicketClient(ticketId, res) {
-    if (!ticketClients.has(ticketId)) ticketClients.set(ticketId, new Set());
-    ticketClients.get(ticketId).add(res);
+    const key = String(ticketId);
+    if (!ticketClients.has(key)) ticketClients.set(key, new Set());
+    ticketClients.get(key).add(res);
     res.on('close', () => {
-        const s = ticketClients.get(ticketId);
-        if (s) { s.delete(res); if (!s.size) ticketClients.delete(ticketId); }
+        const s = ticketClients.get(key);
+        if (s) { s.delete(res); if (!s.size) ticketClients.delete(key); }
     });
 }
 

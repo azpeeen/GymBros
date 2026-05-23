@@ -30,6 +30,7 @@
             <li><a href="/area-aluno" data-translate="sidebar.painel"><i class="fas fa-tachometer-alt"></i> Painel</a></li>
             <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" class="active" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
+            <li><a href="/nutricao" data-translate="sidebar.nutricao"><i class="fas fa-utensils"></i> Nutrição</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -103,6 +104,57 @@
                 <canvas id="graficoTreinos"></canvas>
             </section>
         </section>
+
+        <!-- GRÁFICO: EVOLUÇÃO DE CARGA POR EXERCÍCIO -->
+        <% if (locals.exerciciosExecutados && exerciciosExecutados.length > 0) { %>
+        <%
+        const _bodyPt = { chest:'peito', back:'costas', shoulders:'ombros', 'upper arms':'braços', 'lower arms':'antebraços', 'upper legs':'coxas', 'lower legs':'panturrilhas', waist:'abdômen', neck:'pescoço', cardio:'cardio' };
+        const _bodyEs = { chest:'pecho', back:'espalda', shoulders:'hombros', 'upper arms':'brazos', 'lower arms':'antebrazos', 'upper legs':'muslos', 'lower legs':'pantorrillas', waist:'cintura', neck:'cuello', cardio:'cardio' };
+        function _getNome(ex) {
+            if (locale === 'en') return ex.name;
+            if (locale === 'es') return ex.name_es || ex.name_pt || ex.name;
+            return ex.name_pt || ex.name;
+        }
+        function _getBodyPart(bp) {
+            if (locale === 'en') return bp;
+            if (locale === 'es') return _bodyEs[bp] || bp;
+            return _bodyPt[bp] || bp;
+        }
+        %>
+        <section class="evo-section" id="secGraficoCarga">
+            <section class="evo-section-header">
+                <h2><i class="fas fa-arrow-trend-up"></i> Evolução de Carga</h2>
+                <small>progressão de peso por exercício</small>
+            </section>
+            <section style="margin-bottom:14px">
+                <select id="exercicio-select" class="evo-exercicio-select">
+                    <% exerciciosExecutados.forEach(ex => { %>
+                    <option value="<%= ex.id %>"><%= _getNome(ex) %> (<%= _getBodyPart(ex.body_part) %>)</option>
+                    <% }) %>
+                </select>
+            </section>
+            <section class="evo-chart-wrap">
+                <canvas id="graficoCarga"></canvas>
+            </section>
+            <section class="evo-empty" id="carga-empty" style="display:none">
+                <i class="fas fa-chart-line"></i>
+                Nenhum dado de carga para este exercício ainda.
+            </section>
+        </section>
+        <% } %>
+
+        <!-- GRÁFICO: VOLUME SEMANAL -->
+        <% if (locals.volumeSemanal && volumeSemanal.length > 0) { %>
+        <section class="evo-section" id="secGraficoVolume">
+            <section class="evo-section-header">
+                <h2><i class="fas fa-calendar-week"></i> Volume Semanal</h2>
+                <small>sessões concluídas nas últimas 8 semanas</small>
+            </section>
+            <section class="evo-chart-wrap">
+                <canvas id="graficoVolume"></canvas>
+            </section>
+        </section>
+        <% } %>
 
         <!-- TABELA DE TREINOS REGISTRADOS -->
         <section class="evo-section">
@@ -431,6 +483,105 @@ if (todosEventos.length === 0) {
         </section>`;
     }).join('');
 }
+
+// ─── UTILITÁRIO DE DATA ────────────────────────────────
+function formatarData(val) {
+    if (!val) return '—';
+    if (val instanceof Date) return val.toLocaleDateString('pt-BR', { day:'2-digit', month:'short' });
+    const s = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const [y, m, d] = s.split('-');
+        return new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' });
+    }
+    const dt = new Date(s);
+    return isNaN(dt) ? s : dt.toLocaleDateString('pt-BR', { day:'2-digit', month:'short' });
+}
+
+// ─── GRÁFICO EVOLUÇÃO DE CARGA ─────────────────────────
+<% if (locals.exerciciosExecutados && exerciciosExecutados.length > 0) { %>
+let _chartCarga = null;
+
+async function carregarCarga(exercicioId) {
+    const res  = await fetch('/api/evolucao/exercicio/' + exercicioId);
+    const data = await res.json();
+    const canvas = document.getElementById('graficoCarga');
+    const empty  = document.getElementById('carga-empty');
+    if (!data.length) {
+        canvas.style.display = 'none';
+        empty.style.display  = 'block';
+        return;
+    }
+    canvas.style.display = 'block';
+    empty.style.display  = 'none';
+    const labels = data.map(d => formatarData(d.data));
+    const cargas = data.map(d => parseFloat(d.carga_maxima));
+    if (_chartCarga) _chartCarga.destroy();
+    _chartCarga = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Carga máxima (kg)', data: cargas,
+                borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.08)',
+                pointBackgroundColor: '#FFD700', pointRadius: 4, pointHoverRadius: 6,
+                tension: 0.35, fill: true, borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1A1A1A', borderColor: '#2E2E2E', borderWidth: 1,
+                    titleColor: '#fff', bodyColor: '#FFD700', padding: 10,
+                    callbacks: { label: ctx => ` ${ctx.parsed.y} kg` }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#888' }, grid: { color: '#1e1e1e' } },
+                y: { ticks: { color: '#888', callback: v => v + ' kg' }, grid: { color: '#1e1e1e' }, beginAtZero: false }
+            }
+        }
+    });
+}
+const _selEx = document.getElementById('exercicio-select');
+_selEx.addEventListener('change', () => carregarCarga(_selEx.value));
+carregarCarga(_selEx.value);
+<% } %>
+
+// ─── GRÁFICO VOLUME SEMANAL ────────────────────────────
+<% if (locals.volumeSemanal && volumeSemanal.length > 0) { %>
+(function() {
+    const vd      = <%- JSON.stringify(volumeSemanal) %>;
+    const labels  = vd.map(d => formatarData(d.inicio_semana));
+    const sessoes = vd.map(d => Number(d.sessoes));
+    new Chart(document.getElementById('graficoVolume').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Sessões', data: sessoes,
+                backgroundColor: 'rgba(255,215,0,0.65)', borderColor: '#FFD700',
+                borderWidth: 1, borderRadius: 4, maxBarThickness: 48
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1A1A1A', borderColor: '#2E2E2E', borderWidth: 1,
+                    titleColor: '#fff', bodyColor: '#FFD700', padding: 10,
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#888' }, grid: { color: '#1e1e1e' } },
+                y: { ticks: { color: '#888', stepSize: 1 }, grid: { color: '#1e1e1e' }, beginAtZero: true }
+            }
+        }
+    });
+})();
+<% } %>
 </script>
 </body>
 </html>

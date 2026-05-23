@@ -213,6 +213,7 @@ body.light-mode .chat-textarea  { background: #DEDAD6; border-color: #CCC9C5; co
             <li><a href="/area-aluno" data-translate="sidebar.painel"><i class="fas fa-tachometer-alt"></i> Painel</a></li>
             <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
             <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
+            <li><a href="/nutricao" data-translate="sidebar.nutricao"><i class="fas fa-utensils"></i> Nutrição</a></li>
             <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
             <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
             <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
@@ -345,7 +346,7 @@ async function loadTickets() {
                     <section class="ticket-avatar"><i class="fas ${icones[t.tipo]||'fa-ticket'}"></i></section>
                     <section>
                         <section class="ticket-title">${escHtml(t.assunto)}</section>
-                        <section class="ticket-meta">#${t.id} · ${escHtml(t.tipo)} · ${new Date(t.createdAt).toLocaleDateString('pt-BR')}</section>
+                        <section class="ticket-meta">#${t.id} · ${escHtml(t.tipo)} · ${new Date(t.created_at || t.createdAt).toLocaleDateString('pt-BR')}</section>
                     </section>
                 </section>
                 <span class="ticket-status ${t.status}">${t.status.replace('_',' ')}</span>
@@ -434,7 +435,10 @@ async function loadMessages() {
 }
 
 function bubbleHtml(m) {
-    const time   = new Date(m.criadaEm).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+    const rawDate = m.criadaEm || m.created_at;
+    const time = rawDate
+        ? new Date(rawDate).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+        : '--:--';
     const sender = m.remetente === 'admin' ? 'Suporte GymBros' : 'Você';
     return `<section class="bubble ${m.remetente}"><section class="bubble-body">${escHtml(m.texto)}</section><section class="bubble-meta">${sender} · ${time}</section></section>`;
 }

@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<%- include('../partials/seo') %>
+<link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/footer.css">
+<link rel="stylesheet" href="/css/area-aluno.css">
+<link rel="stylesheet" href="/css/nutricao.css">
+</head>
+<body>
+
+<%- include('../partials/header-aluno') %>
+
+<%
+const diasSemana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const tiposRefeicao = [
+    { key: 'cafe',   label: 'Café da manhã', icon: 'fa-mug-hot' },
+    { key: 'almoco', label: 'Almoço',        icon: 'fa-bowl-food' },
+    { key: 'jantar', label: 'Jantar',         icon: 'fa-moon' },
+    { key: 'lanche', label: 'Lanche',         icon: 'fa-apple-whole' },
+    { key: 'outro',  label: 'Outro',          icon: 'fa-utensils' },
+];
+const kcalRingCircum  = 314;
+const kcalPct         = Math.min(1, metas.kcal > 0 ? totaisHoje.kcal / metas.kcal : 0);
+const kcalDashOffset  = Math.round(kcalRingCircum * (1 - kcalPct));
+const kcalPctDisplay  = Math.min(100, Math.round(kcalPct * 100));
+const macros = [
+    { key: 'proteina', label: 'Proteína',    atual: totaisHoje.proteina, meta: metas.proteina, unit: 'g',  cor: '#FFD700' },
+    { key: 'carbs',    label: 'Carboidrato', atual: totaisHoje.carbs,    meta: metas.carbs,    unit: 'g',  cor: '#4fc3f7' },
+    { key: 'gordura',  label: 'Gordura',     atual: totaisHoje.gordura,  meta: metas.gordura,  unit: 'g',  cor: '#ff9800' },
+    { key: 'fibra',    label: 'Fibra',       atual: totaisHoje.fibra,    meta: metas.fibra,    unit: 'g',  cor: '#66bb6a' },
+];
+%>
+
+<section class="aluno-dashboard">
+    <section class="sidebar-overlay" id="sidebarOverlay"></section>
+
+    <!-- SIDEBAR -->
+    <section class="aluno-sidebar">
+        <section class="aluno-profile">
+            <section class="avatar">
+                <img id="sidebar-avatar" src="<%= user.profile_photo || '/images/avatar.png' %>" alt="Avatar">
+            </section>
+            <h2><%= user.nome %></h2>
+            <p data-translate="sidebar.role">Aluno GymBros</p>
+        </section>
+        <ul class="aluno-menu">
+            <li><a href="/area-aluno" data-translate="sidebar.painel"><i class="fas fa-tachometer-alt"></i> Painel</a></li>
+            <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
+            <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
+            <li><a href="/nutricao" class="active" data-translate="sidebar.nutricao"><i class="fas fa-utensils"></i> Nutrição</a></li>
+            <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
+            <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
+            <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
+            <% } else { %>
+            <li><a href="/meu-plano?upgrade=1" class="menu-locked" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA 🔒</a></li>
+            <li><a href="/meu-plano?upgrade=1" class="menu-locked" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal 🔒</a></li>
+            <% } %>
+            <li><a href="/imc-form" data-translate="sidebar.imc"><i class="fas fa-clipboard-list"></i> Meu Perfil IMC</a></li>
+            <li><a href="/perfil/<%= user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
+            <li><a href="/meu-plano" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
+            <li><a href="/suporte" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li>
+                <button class="sidebar-logout-btn" onclick="abrirModalLogout()" type="button">
+                    <i class="fas fa-sign-out-alt"></i> Sair da conta
+                </button>
+            </li>
+        </ul>
+    </section>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <section class="aluno-main">
+        <section class="dashboard-top">
+            <h1><i class="fas fa-utensils"></i> Nutrição</h1>
+            <p>Calorias, macros e hidratação do dia</p>
+        </section>
+
+        <% if (!imc) { %>
+        <section class="nutri-aviso">
+            <i class="fas fa-exclamation-circle"></i>
+            Preencha seu <a href="/imc-form">Perfil IMC</a> para receber metas personalizadas de nutrição.
+        </section>
+        <% } %>
+
+        <!-- 1. HERO CARD -->
+        <section class="nutri-hero">
+            <section class="nutri-hero-left">
+                <section class="nutri-objetivo-seletor">
+                    <button class="nutri-obj-btn<%= objetivoAtual === 'cutting'   ? ' active' : '' %>" onclick="setObjetivo('cutting')"   type="button">Cutting</button>
+                    <button class="nutri-obj-btn<%= objetivoAtual === 'manutencao'? ' active' : '' %>" onclick="setObjetivo('manutencao')" type="button">Manutenção</button>
+                    <button class="nutri-obj-btn<%= objetivoAtual === 'bulking'   ? ' active' : '' %>" onclick="setObjetivo('bulking')"   type="button">Bulking</button>
+                </section>
+                <h2 class="nutri-hero-title">
+                    <span id="kcalRestantes"><%= Math.max(0, metas.kcal - totaisHoje.kcal) %></span>
+                    <small>kcal restantes</small>
+                </h2>
+                <p class="nutri-hero-sub" id="heroSub">
+                    <%= totaisHoje.kcal %> consumidas · <%= metas.kcal %> meta
+                </p>
+            </section>
+            <section class="nutri-hero-right">
+                <svg class="nutri-ring" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#2a2a2a" stroke-width="10"/>
+                    <circle cx="60" cy="60" r="50" fill="none"
+                            stroke="<%= totaisHoje.kcal > metas.kcal ? '#e74c3c' : '#FFD700' %>"
+                            stroke-width="10"
+                            stroke-dasharray="314"
+                            stroke-dashoffset="<%= kcalDashOffset %>"
+                            stroke-linecap="round"
+                            transform="rotate(-90 60 60)"
+                            id="kcalRingCircle"/>
+                    <text x="60" y="55" text-anchor="middle" fill="#FFD700" font-size="18" font-weight="800" id="kcalRingPct">
+                        <%= kcalPctDisplay %>%
+                    </text>
+                    <text x="60" y="72" text-anchor="middle" fill="#888" font-size="9">de kcal</text>
+                </svg>
+            </section>
+        </section>
+
+        <!-- 2. FAIXA DE MACROS -->
+        <section class="nutri-macros">
+            <% macros.forEach(m => { %>
+            <% const pct = Math.min(100, m.meta > 0 ? Math.round((m.atual / m.meta) * 100) : 0); %>
+            <section class="nutri-macro-bar">
+                <section class="nutri-macro-top">
+                    <span class="nutri-macro-label"><%= m.label %></span>
+                    <span class="nutri-macro-vals">
+                        <strong id="macro-<%= m.key %>-atual"><%= parseFloat(m.atual).toFixed(1) %></strong>
+                        / <%= m.meta %><%= m.unit %>
+                    </span>
+                </section>
+                <section class="nutri-bar-track">
+                    <section class="nutri-bar-fill" id="macro-<%= m.key %>-fill"
+                        style="width:<%= pct %>%; background:<%= pct >= 100 ? '#e74c3c' : m.cor %>">
+                    </section>
+                </section>
+                <span class="nutri-macro-falta" id="macro-<%= m.key %>-falta">
+                    <%= m.atual >= m.meta ? '✓ meta atingida' : `faltam ${(m.meta - m.atual).toFixed(1)}${m.unit}` %>
+                </span>
+            </section>
+            <% }) %>
+        </section>
+
+        <!-- 3. ÁGUA -->
+        <section class="nutri-agua-card">
+            <section class="nutri-agua-row">
+                <section class="nutri-agua-left">
+                    <i class="fas fa-droplet" style="color:#4fc3f7;font-size:1.1rem"></i>
+                    <span class="nutri-agua-label">Água</span>
+                    <section class="nutri-agua-vals">
+                        <strong id="aguaAtual">0</strong>
+                        <small>/ <%= (metas.agua/1000).toFixed(1) %>L</small>
+                    </section>
+                </section>
+                <section class="nutri-agua-right">
+                    <button class="nutri-agua-btn" onclick="ajustarAgua(-aguaVolume())" type="button">−</button>
+                    <section class="nutri-agua-centro">
+                        <span id="aguaCopos">0 registros</span>
+                        <select id="aguaVolumeSelect" class="nutri-agua-select" onchange="salvarVolume()">
+                            <option value="150">150ml</option>
+                            <option value="200">200ml</option>
+                            <option value="250" selected>250ml</option>
+                            <option value="300">300ml</option>
+                            <option value="350">350ml</option>
+                            <option value="400">400ml</option>
+                            <option value="500">500ml</option>
+                            <option value="600">600ml</option>
+                            <option value="750">750ml</option>
+                            <option value="1000">1L</option>
+                        </select>
+                    </section>
+                    <button class="nutri-agua-btn" onclick="ajustarAgua(aguaVolume())" type="button">+</button>
+                </section>
+            </section>
+            <section class="nutri-bar-track" style="margin-top:8px">
+                <section class="nutri-bar-fill" id="aguaFill" style="background:#4fc3f7;width:0%"></section>
+            </section>
+        </section>
+
+        <!-- 4. INSIGHT CARD -->
+        <section class="nutri-insight-card" id="nutri-insight">
+            <i class="fas fa-circle-check" style="color:#22c55e"></i>
+            <span>Carregando insight...</span>
+        </section>
+
+        <!-- 5. TIMELINE DE REFEIÇÕES -->
+        <% tiposRefeicao.forEach(tipo => { %>
+        <% const itens = registrosHoje.filter(r => r.refeicao_tipo === tipo.key); %>
+        <% const totalTipo = itens.reduce((a, r) => a + (Number(r.kcal) || 0), 0); %>
+        <section class="nutri-refeicao-grupo">
+            <section class="nutri-refeicao-header" onclick="toggleRefeicao('<%= tipo.key %>')">
+                <section class="nutri-refeicao-left">
+                    <i class="fas <%= tipo.icon %>"></i>
+                    <span><%= tipo.label %></span>
+                </section>
+                <section class="nutri-refeicao-right">
+                    <span class="nutri-refeicao-kcal" id="kcal-tipo-<%= tipo.key %>"><%= totalTipo %> kcal</span>
+                    <button class="nutri-add-btn" onclick="event.stopPropagation(); abrirForm('<%= tipo.key %>')" type="button" title="Adicionar">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </section>
+            </section>
+            <section class="nutri-refeicao-itens" id="refeicao-<%= tipo.key %>">
+                <% if (itens.length === 0) { %>
+                <p class="nutri-refeicao-vazio">Nenhum item registrado</p>
+                <% } else { %>
+                <% itens.forEach(r => { %>
+                <% const horaFormatada = r.horario ? String(r.horario).slice(0,5) : null; %>
+                <section class="nutri-item-linha" id="nutri-item-<%= r.id %>">
+                    <section class="nutri-item-info">
+                        <% if (r.foto_url) { %><img src="<%= r.foto_url %>" class="nutri-item-foto" alt=""><% } %>
+                        <section class="nutri-item-texto">
+                            <span class="nutri-item-nome"><%= r.refeicao %></span>
+                            <% if (horaFormatada) { %><span class="nutri-item-hora"><%= horaFormatada %></span><% } %>
+                        </section>
+                    </section>
+                    <span class="nutri-item-macros">
+                        <%= r.kcal %> kcal<% if (Number(r.proteina_g) > 0) { %> · P:<%= parseFloat(r.proteina_g).toFixed(0) %>g<% } %>
+                    </span>
+                    <button class="nutri-item-del" onclick="deletarRegistro(<%= r.id %>, '<%= tipo.key %>', <%= r.kcal %>, <%= r.proteina_g||0 %>, <%= r.carbs_g||0 %>, <%= r.gordura_g||0 %>, <%= r.fibra_g||0 %>)" type="button" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </section>
+                <% }) %>
+                <% } %>
+            </section>
+        </section>
+        <% }) %>
+
+        <!-- 6. ADERÊNCIA SEMANAL -->
+        <section class="nutri-aderencia">
+            <section class="nutri-card-title"><i class="fas fa-calendar-week"></i> Aderência esta semana</section>
+            <section class="nutri-aderencia-grid">
+                <% aderenciaSemanal.forEach(d => { %>
+                <%
+                const diaSem  = diasSemana[new Date(String(d.data) + 'T12:00:00').getDay()];
+                const pctAder = Math.min(100, metas.kcal > 0 ? Math.round((Number(d.total_kcal) / metas.kcal) * 100) : 0);
+                const aderClass = pctAder === 0 ? 'ader-zero' : pctAder < 70 ? 'ader-low' : pctAder > 115 ? 'ader-over' : 'ader-ok';
+                %>
+                <section class="nutri-ader-dia <%= aderClass %>">
+                    <section class="nutri-ader-bar" style="height:<%= pctAder %>%"></section>
+                    <span class="nutri-ader-label"><%= diaSem %></span>
+                    <span class="nutri-ader-pct"><%= pctAder %>%</span>
+                </section>
+                <% }) %>
+            </section>
+            <section class="nutri-aderencia-legend">
+                <span><span class="ader-ok-dot"></span>Meta atingida</span>
+                <span><span class="ader-low-dot"></span>Abaixo</span>
+                <span><span class="ader-over-dot"></span>Acima</span>
+            </section>
+        </section>
+
+    </section><!-- /aluno-main -->
+</section><!-- /aluno-dashboard -->
+
+<!-- FORM MODAL (bottom sheet) -->
+<section class="nutri-form-modal" id="nutri-form-modal">
+    <section class="nutri-form-header">
+        <h3 id="nutri-form-titulo">Adicionar refeição</h3>
+        <button class="nutri-form-close" onclick="fecharForm()" type="button"><i class="fas fa-times"></i></button>
+    </section>
+    <input type="hidden" id="nutri-tipo-input">
+    <section class="nutri-form-foto-row">
+        <button class="nutri-btn-foto" id="nutri-foto-btn" type="button">
+            <i class="fas fa-camera"></i> Analisar por foto
+        </button>
+        <span class="nutri-foto-status" id="nutri-foto-status"></span>
+        <input type="file" id="nutri-foto-input" accept="image/*" capture="environment" style="display:none">
+    </section>
+    <section class="nutri-peso-wrapper" id="nutri-peso-wrapper" style="display:none">
+        <label class="nutri-label">Peso da porção (g) <span class="nutri-label-hint">— opcional, melhora a análise</span></label>
+        <section class="nutri-peso-row">
+            <input type="number" id="nutri-peso-g" class="nutri-input" placeholder="Ex: 200" min="1" step="1" style="margin-bottom:0;flex:1">
+            <button class="nutri-btn-analisar" id="nutri-btn-analisar" type="button">
+                <i class="fas fa-magnifying-glass"></i> Analisar
+            </button>
+        </section>
+    </section>
+    <input type="text" id="nutri-refeicao" class="nutri-input" placeholder="Nome do alimento / refeição *">
+    <section class="nutri-form-grid">
+        <section>
+            <label class="nutri-label">Calorias (kcal) *</label>
+            <input type="number" id="nutri-kcal" class="nutri-input" placeholder="350" min="0">
+        </section>
+        <section>
+            <label class="nutri-label">Proteína (g)</label>
+            <input type="number" id="nutri-proteina" class="nutri-input" placeholder="30" min="0" step="0.1">
+        </section>
+        <section>
+            <label class="nutri-label">Carboidrato (g)</label>
+            <input type="number" id="nutri-carbs" class="nutri-input" placeholder="45" min="0" step="0.1">
+        </section>
+        <section>
+            <label class="nutri-label">Gordura (g)</label>
+            <input type="number" id="nutri-gordura" class="nutri-input" placeholder="12" min="0" step="0.1">
+        </section>
+        <section>
+            <label class="nutri-label">Fibra (g)</label>
+            <input type="number" id="nutri-fibra" class="nutri-input" placeholder="3" min="0" step="0.1">
+        </section>
+    </section>
+    <button class="nutri-btn-salvar" id="nutri-salvar" type="button">
+        <i class="fas fa-check"></i> Registrar
+    </button>
+</section>
+<section class="nutri-modal-overlay" id="nutri-overlay" onclick="fecharForm()"></section>
+
+<%- include('../partials/footer') %>
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+<script src="/js/translate.js"></script>
+<script>
+window._METAS = <%- JSON.stringify(metas) %>;
+window._TOTAIS_HOJE = <%- JSON.stringify(totaisHoje) %>;
+</script>
+<script>
+'use strict';
+
+const _METAS  = window._METAS;
+const _totais = { ...window._TOTAIS_HOJE };
+
+// ── XSS helper ────────────────────────────────────────────────
+function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Ring SVG ──────────────────────────────────────────────────
+function atualizarRing(kcalAtual) {
+    const meta    = _METAS.kcal;
+    const pct     = Math.min(1, meta > 0 ? kcalAtual / meta : 0);
+    const offset  = Math.round(314 * (1 - pct));
+    const circle  = document.getElementById('kcalRingCircle');
+    const pctEl   = document.getElementById('kcalRingPct');
+    const restEl  = document.getElementById('kcalRestantes');
+    const subEl   = document.getElementById('heroSub');
+    if (circle) {
+        circle.setAttribute('stroke-dashoffset', offset);
+        circle.setAttribute('stroke', kcalAtual > meta ? '#e74c3c' : '#FFD700');
+    }
+    if (pctEl)  pctEl.textContent  = Math.min(100, Math.round(pct * 100)) + '%';
+    if (restEl) restEl.textContent = Math.max(0, meta - kcalAtual);
+    if (subEl)  subEl.textContent  = `${kcalAtual} consumidas · ${meta} meta`;
+}
+
+// ── Barras de macro ───────────────────────────────────────────
+const _macroConfig = {
+    proteina: { meta: _METAS.proteina, unit: 'g', cor: '#FFD700' },
+    carbs:    { meta: _METAS.carbs,    unit: 'g', cor: '#4fc3f7' },
+    gordura:  { meta: _METAS.gordura,  unit: 'g', cor: '#ff9800' },
+    fibra:    { meta: _METAS.fibra,    unit: 'g', cor: '#66bb6a' },
+};
+
+function atualizarMacroBar(key, valor) {
+    const cfg  = _macroConfig[key];
+    if (!cfg) return;
+    const pct  = Math.min(100, cfg.meta > 0 ? Math.round((valor / cfg.meta) * 100) : 0);
+    const fill = document.getElementById(`macro-${key}-fill`);
+    const num  = document.getElementById(`macro-${key}-atual`);
+    const msg  = document.getElementById(`macro-${key}-falta`);
+    if (fill) { fill.style.width = pct + '%'; fill.style.background = pct >= 100 ? '#e74c3c' : cfg.cor; }
+    if (num)  num.textContent  = parseFloat(valor).toFixed(1);
+    if (msg)  msg.textContent  = valor >= cfg.meta ? '✓ meta atingida' : `faltam ${(cfg.meta - valor).toFixed(1)}${cfg.unit}`;
+}
+
+// ── Insight ───────────────────────────────────────────────────
+function gerarInsight() {
+    const faltaKcal  = Math.max(0, _METAS.kcal      - _totais.kcal);
+    const faltaProt  = Math.max(0, _METAS.proteina  - _totais.proteina);
+    const faltaFibra = Math.max(0, _METAS.fibra     - _totais.fibra);
+    const msgs = [];
+    if (faltaProt  > 10)  msgs.push(`faltam <strong>${faltaProt.toFixed(0)}g de proteína</strong>`);
+    if (faltaFibra >  5)  msgs.push(`faltam <strong>${faltaFibra.toFixed(0)}g de fibra</strong>`);
+    if (faltaKcal  > 200) msgs.push(`faltam <strong>${faltaKcal} kcal</strong> para a meta`);
+    if (_totais.kcal > _METAS.kcal) msgs.push(`você passou <strong>${_totais.kcal - _METAS.kcal} kcal</strong> da meta hoje`);
+
+    const el = document.getElementById('nutri-insight');
+    if (!el) return;
+    if (msgs.length === 0) {
+        el.innerHTML = '<i class="fas fa-circle-check" style="color:#22c55e"></i> <span>Tudo certo! Metas do dia em ordem.</span>';
+    } else {
+        el.innerHTML = `<i class="fas fa-lightbulb"></i> <span>${msgs.join(' · ')}</span>`;
+    }
+}
+
+// ── Atualizar totais (após add/delete) ────────────────────────
+function atualizarTotais(dKcal, dProt, dCarbs, dGord, dFibra) {
+    _totais.kcal     = Math.max(0, _totais.kcal     + dKcal);
+    _totais.proteina = Math.max(0, _totais.proteina + dProt);
+    _totais.carbs    = Math.max(0, _totais.carbs    + dCarbs);
+    _totais.gordura  = Math.max(0, _totais.gordura  + dGord);
+    _totais.fibra    = Math.max(0, _totais.fibra    + dFibra);
+    atualizarRing(_totais.kcal);
+    Object.keys(_macroConfig).forEach(k => atualizarMacroBar(k, _totais[k]));
+    gerarInsight();
+}
+
+// ── Água (localStorage) ───────────────────────────────────────
+const AGUA_KEY     = 'gymbros_agua_' + new Date().toLocaleDateString('en-CA');
+const AGUA_VOL_KEY = 'gymbros_agua_vol';
+
+function aguaVolume() {
+    return parseInt(document.getElementById('aguaVolumeSelect').value) || 250;
+}
+
+function salvarVolume() {
+    localStorage.setItem(AGUA_VOL_KEY, aguaVolume());
+    updateAguaUI();
+}
+
+function getAgua() {
+    return parseInt(localStorage.getItem(AGUA_KEY) || '0');
+}
+
+function ajustarAgua(delta) {
+    const novo = Math.max(0, getAgua() + delta);
+    localStorage.setItem(AGUA_KEY, novo);
+    updateAguaUI();
+}
+
+function updateAguaUI() {
+    const ml   = getAgua();
+    const meta = _METAS.agua;
+    const pct  = Math.min(100, meta > 0 ? Math.round((ml / meta) * 100) : 0);
+    const vol  = aguaVolume();
+    const qtd  = Math.round(ml / vol);
+    const litros = (ml / 1000).toFixed(2).replace(/\.?0+$/, '') + 'L';
+
+    const elAtual = document.getElementById('aguaAtual');
+    const elFill  = document.getElementById('aguaFill');
+    const elCopos = document.getElementById('aguaCopos');
+
+    if (elAtual) elAtual.textContent = litros;
+    if (elFill)  elFill.style.width  = pct + '%';
+    if (elCopos) elCopos.textContent = qtd === 0 ? '0 registros' : `${qtd} × ${vol}ml`;
+}
+
+// ── Toggle seção de refeição ──────────────────────────────────
+function toggleRefeicao(tipo) {
+    const el = document.getElementById(`refeicao-${tipo}`);
+    if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+// ── Modal / bottom sheet ──────────────────────────────────────
+const _tipoLabels = { cafe:'Café da manhã', almoco:'Almoço', jantar:'Jantar', lanche:'Lanche', outro:'Outro' };
+
+function abrirForm(tipo) {
+    document.getElementById('nutri-tipo-input').value = tipo;
+    const tituloEl = document.getElementById('nutri-form-titulo');
+    if (tituloEl) tituloEl.textContent = `Adicionar · ${_tipoLabels[tipo] || tipo}`;
+    ['nutri-refeicao','nutri-kcal','nutri-proteina','nutri-carbs','nutri-gordura','nutri-fibra','nutri-peso-g']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    _pendingFotoFile = null;
+    const pesoWrapper = document.getElementById('nutri-peso-wrapper');
+    if (pesoWrapper) pesoWrapper.style.display = 'none';
+    document.getElementById('nutri-foto-status').textContent = '';
+    document.getElementById('nutri-form-modal').classList.add('open');
+    document.getElementById('nutri-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => { const el = document.getElementById('nutri-refeicao'); if (el) el.focus(); }, 280);
+}
+
+function fecharForm() {
+    document.getElementById('nutri-form-modal').classList.remove('open');
+    document.getElementById('nutri-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    _pendingFotoFile = null;
+    const pesoWrapper = document.getElementById('nutri-peso-wrapper');
+    if (pesoWrapper) pesoWrapper.style.display = 'none';
+    document.getElementById('nutri-foto-status').textContent = '';
+}
+
+// ── Salvar refeição ───────────────────────────────────────────
+document.getElementById('nutri-salvar').addEventListener('click', async function () {
+    const nome = document.getElementById('nutri-refeicao').value.trim();
+    const kcal = document.getElementById('nutri-kcal').value;
+    if (!nome || !kcal) { document.getElementById('nutri-refeicao').focus(); return; }
+
+    this.disabled = true;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+
+    const tipo = document.getElementById('nutri-tipo-input').value || 'outro';
+    const body = {
+        refeicao:     nome,
+        refeicao_tipo: tipo,
+        kcal:         Number(kcal) || 0,
+        proteina_g:   Number(document.getElementById('nutri-proteina').value) || 0,
+        carbs_g:      Number(document.getElementById('nutri-carbs').value)    || 0,
+        gordura_g:    Number(document.getElementById('nutri-gordura').value)  || 0,
+        fibra_g:      Number(document.getElementById('nutri-fibra').value)    || 0,
+        foto_url:     _pendingFotoUrl || null,
+    };
+
+    try {
+        const res  = await fetch('/api/nutricao/registrar', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            adicionarItemTimeline(data.log, tipo);
+            atualizarTotais(body.kcal, body.proteina_g, body.carbs_g, body.gordura_g, body.fibra_g);
+            atualizarKcalTipo(tipo, body.kcal);
+            _pendingFotoUrl = null;
+            fecharForm();
+        } else {
+            alert(data.erro || 'Erro ao registrar.');
+        }
+    } catch (_) {
+        alert('Erro de rede.');
+    } finally {
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-check"></i> Registrar';
+    }
+});
+
+// ── Adicionar item na timeline ────────────────────────────────
+function adicionarItemTimeline(log, tipo) {
+    const container = document.getElementById(`refeicao-${tipo}`);
+    if (!container) return;
+    const vazio = container.querySelector('.nutri-refeicao-vazio');
+    if (vazio) vazio.remove();
+
+    const item = document.createElement('section');
+    item.className = 'nutri-item-linha';
+    item.id = `nutri-item-${log.id}`;
+    const horaHtml = log.horario ? `<span class="nutri-item-hora">${esc(String(log.horario).slice(0,5))}</span>` : '';
+    item.innerHTML = `
+        ${log.foto_url ? `<img src="${esc(log.foto_url)}" class="nutri-item-foto" alt="">` : ''}
+        <section class="nutri-item-info">
+            <section class="nutri-item-texto">
+                <span class="nutri-item-nome">${esc(log.refeicao)}</span>
+                ${horaHtml}
+            </section>
+        </section>
+        <span class="nutri-item-macros">${log.kcal} kcal${Number(log.proteina_g) > 0 ? ` · P:${parseFloat(log.proteina_g).toFixed(0)}g` : ''}</span>
+        <button class="nutri-item-del" onclick="deletarRegistro(${Number(log.id)},'${tipo}',${log.kcal||0},${log.proteina_g||0},${log.carbs_g||0},${log.gordura_g||0},${log.fibra_g||0})" type="button" title="Excluir">
+            <i class="fas fa-trash"></i>
+        </button>`;
+    container.appendChild(item);
+}
+
+// ── Atualizar kcal por tipo na header ─────────────────────────
+const _kcalPorTipo = {};
+function atualizarKcalTipo(tipo, delta) {
+    _kcalPorTipo[tipo] = (_kcalPorTipo[tipo] || 0) + delta;
+    const el = document.getElementById(`kcal-tipo-${tipo}`);
+    if (el) el.textContent = `${Math.max(0, _kcalPorTipo[tipo])} kcal`;
+}
+
+// ── Deletar registro ──────────────────────────────────────────
+async function deletarRegistro(id, tipo, kcal, prot, carbs, gord, fibra) {
+    const el = document.getElementById(`nutri-item-${id}`);
+    if (!el) return;
+    el.style.cssText = 'opacity:0;transform:translateX(20px);transition:opacity .2s,transform .2s;';
+    try {
+        const res  = await fetch(`/api/nutricao/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+            setTimeout(() => {
+                el.remove();
+                atualizarTotais(-kcal, -prot, -carbs, -gord, -fibra);
+                atualizarKcalTipo(tipo, -kcal);
+                const container = document.getElementById(`refeicao-${tipo}`);
+                if (container && !container.querySelector('.nutri-item-linha')) {
+                    container.innerHTML = '<p class="nutri-refeicao-vazio">Nenhum item registrado</p>';
+                }
+            }, 200);
+        } else {
+            el.style.cssText = '';
+        }
+    } catch (_) {
+        el.style.cssText = '';
+    }
+}
+
+// ── Foto → Groq Vision (two-step: select → peso → analisar) ──
+let _pendingFotoUrl  = null;
+let _pendingFotoFile = null;
+
+document.getElementById('nutri-foto-btn').addEventListener('click', function () {
+    document.getElementById('nutri-foto-input').click();
+});
+
+document.getElementById('nutri-foto-input').addEventListener('change', function () {
+    if (!this.files[0]) return;
+    _pendingFotoFile = this.files[0];
+    const pesoWrapper = document.getElementById('nutri-peso-wrapper');
+    if (pesoWrapper) pesoWrapper.style.display = '';
+    document.getElementById('nutri-foto-status').textContent = 'Foto selecionada — informe o peso e clique em Analisar.';
+    this.value = '';
+});
+
+document.getElementById('nutri-btn-analisar').addEventListener('click', async function () {
+    if (!_pendingFotoFile) return;
+    const status = document.getElementById('nutri-foto-status');
+    status.textContent = 'Analisando...';
+    this.disabled = true;
+
+    const pesoG = document.getElementById('nutri-peso-g')?.value || '';
+    const fd = new FormData();
+    fd.append('foto', _pendingFotoFile);
+    if (pesoG) fd.append('peso_g', pesoG);
+
+    try {
+        const res  = await fetch('/api/nutricao/foto', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.ok && data.analise) {
+            const a = data.analise;
+            if (a.refeicao)   document.getElementById('nutri-refeicao').value  = a.refeicao;
+            if (a.kcal)       document.getElementById('nutri-kcal').value      = a.kcal;
+            if (a.proteina_g) document.getElementById('nutri-proteina').value  = a.proteina_g;
+            if (a.carbs_g)    document.getElementById('nutri-carbs').value     = a.carbs_g;
+            if (a.gordura_g)  document.getElementById('nutri-gordura').value   = a.gordura_g;
+            if (a.fibra_g)    document.getElementById('nutri-fibra').value     = a.fibra_g;
+            _pendingFotoUrl  = data.fotoUrl || null;
+            _pendingFotoFile = null;
+            status.textContent = 'Pronto!';
+            const pesoWrapper = document.getElementById('nutri-peso-wrapper');
+            if (pesoWrapper) pesoWrapper.style.display = 'none';
+        } else {
+            status.textContent = 'Não foi possível analisar.';
+        }
+    } catch (_) {
+        status.textContent = 'Erro ao enviar.';
+    } finally {
+        this.disabled = false;
+    }
+    setTimeout(() => status.textContent = '', 4000);
+});
+
+// ── Objetivo nutricional ──────────────────────────────────────
+async function setObjetivo(objetivo) {
+    document.querySelectorAll('.nutri-obj-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector(`.nutri-obj-btn[onclick*="'${objetivo}'"]`);
+    if (btn) btn.classList.add('active');
+    try {
+        await fetch('/api/nutricao/objetivo', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ objetivo }),
+        });
+        window.location.reload();
+    } catch (_) {}
+}
+
+// ── Init ──────────────────────────────────────────────────────
+(function init() {
+    // Inicializar _kcalPorTipo com dados do servidor
+    <%
+    const tipoKeys = ['cafe','almoco','jantar','lanche','outro'];
+    tipoKeys.forEach(k => {
+        const sum = registrosHoje.filter(r => r.refeicao_tipo === k).reduce((a,r) => a + (Number(r.kcal)||0), 0);
+    %>
+    _kcalPorTipo['<%= k %>'] = <%= sum %>;
+    <% }) %>
+
+    const volSalvo = localStorage.getItem(AGUA_VOL_KEY);
+    if (volSalvo) {
+        const sel = document.getElementById('aguaVolumeSelect');
+        const opcoes = Array.from(sel.options).map(o => parseInt(o.value));
+        const maisPerto = opcoes.reduce((a, b) =>
+            Math.abs(b - parseInt(volSalvo)) < Math.abs(a - parseInt(volSalvo)) ? b : a
+        );
+        sel.value = maisPerto;
+    }
+    updateAguaUI();
+    gerarInsight();
+    atualizarRing(_totais.kcal);
+})();
+</script>
+</body>
+</html>
