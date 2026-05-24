@@ -29,100 +29,49 @@ function safeJson(str, fallback) {
     catch { return fallback; }
 }
 
-// Adiciona colunas de tradução de exercícios se ainda não existirem
+// Migrations sequenciais — uma conexão só, evita max_user_connections no Clever Cloud
 (async () => {
-    const cols = [
+    // 1. Colunas de tradução de exercícios
+    for (const sql of [
         'ALTER TABLE exercises ADD COLUMN name_pt VARCHAR(255) DEFAULT NULL',
         'ALTER TABLE exercises ADD COLUMN name_es VARCHAR(255) DEFAULT NULL',
-    ];
-    for (const sql of cols) {
+    ]) {
         try { await db.execute(sql); }
-        catch (err) { if (err.errno !== 1060) console.error('[router] alter exercises:', err.message); }
+        catch (err) { if (err.errno !== 1060) console.error('[migration] alter exercises:', err.message); }
     }
-})();
 
-// Adiciona colunas de perfil se ainda não existirem
-(async () => {
-    const cols = [
+    // 2. Colunas de perfil de usuário
+    for (const sql of [
         'ALTER TABLE user ADD COLUMN instagram_username VARCHAR(60) DEFAULT NULL',
         'ALTER TABLE user ADD COLUMN username VARCHAR(30) DEFAULT NULL',
         'ALTER TABLE user ADD COLUMN bio VARCHAR(150) DEFAULT NULL',
         'ALTER TABLE user ADD COLUMN medalhas_destaque JSON DEFAULT NULL',
-    ];
-    for (const sql of cols) {
+    ]) {
         try { await db.execute(sql); }
-        catch (err) { if (err.errno !== 1060) console.error('[router] alter user:', err.message); }
+        catch (err) { if (err.errno !== 1060) console.error('[migration] alter user perfil:', err.message); }
     }
-    try {
-        await db.execute('CREATE UNIQUE INDEX idx_username ON user(username)');
-    } catch (err) {
-        if (err.errno !== 1061) console.error('[router] idx_username:', err.message);
-    }
-})();
+    try { await db.execute('CREATE UNIQUE INDEX idx_username ON user(username)'); }
+    catch (err) { if (err.errno !== 1061) console.error('[migration] idx_username:', err.message); }
 
-// Colunas de soft delete e WebAuthn
-(async () => {
-    const cols = [
+    // 3. Colunas de soft delete e WebAuthn (F16)
+    for (const sql of [
         "ALTER TABLE user ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL",
         "ALTER TABLE user ADD COLUMN deletion_scheduled_at TIMESTAMP NULL DEFAULT NULL",
         "ALTER TABLE user ADD COLUMN webauthn_credential_id VARCHAR(500) NULL DEFAULT NULL",
         "ALTER TABLE user ADD COLUMN webauthn_public_key TEXT NULL DEFAULT NULL",
         "ALTER TABLE user ADD COLUMN webauthn_counter INT UNSIGNED NOT NULL DEFAULT 0",
         "ALTER TABLE user ADD COLUMN webauthn_enabled TINYINT(1) NOT NULL DEFAULT 0",
-    ];
-    for (const sql of cols) {
+    ]) {
         try { await db.execute(sql); }
-        catch (err) { if (err.errno !== 1060) console.error('[F16 alter user]', err.message); }
+        catch (err) { if (err.errno !== 1060) console.error('[migration] alter user F16:', err.message); }
     }
     try {
         await db.execute(
             "ALTER TABLE user MODIFY COLUMN status ENUM('ativo','inativo','pendente_exclusao') NOT NULL DEFAULT 'ativo'"
         );
-    } catch (err) { if (err.errno !== 1060) console.error('[F16 status enum]', err.message); }
-})();
+    } catch (err) { if (err.errno !== 1060) console.error('[migration] status enum:', err.message); }
 
-// Soft delete cron — anonimiza contas com deletion_scheduled_at vencido (a cada 24h)
-(async () => {
-    async function executarSoftDelete() {
-        try {
-            const [contas] = await db.execute(
-                "SELECT id FROM user WHERE status='pendente_exclusao' AND deletion_scheduled_at <= NOW()"
-            );
-            for (const conta of contas) {
-                await db.execute(`
-                    UPDATE user SET
-                        nome               = 'Usuário Removido',
-                        email              = CONCAT('deleted_', id, '@gymbros.removed'),
-                        cpf                = CONCAT('deleted_', id),
-                        senha_hash         = '',
-                        profile_photo      = NULL,
-                        bio                = NULL,
-                        instagram_username = NULL,
-                        username           = NULL,
-                        deleted_at         = NOW(),
-                        status             = 'inativo',
-                        webauthn_enabled   = 0,
-                        webauthn_credential_id = NULL,
-                        webauthn_public_key    = NULL
-                    WHERE id = ?
-                `, [conta.id]);
-                await db.execute('DELETE FROM nutrition_log WHERE user_id=?',  [conta.id]).catch(() => {});
-                await db.execute('DELETE FROM imc_profile  WHERE user_id=?',  [conta.id]).catch(() => {});
-                await db.execute('DELETE FROM body_photo   WHERE user_id=?',  [conta.id]).catch(() => {});
-            }
-            if (contas.length > 0) console.log(`[soft-delete] ${contas.length} conta(s) anonimizadas`);
-        } catch (err) {
-            console.error('[soft-delete cron]', err.message);
-        }
-    }
-    setTimeout(() => {
-        executarSoftDelete();
-        setInterval(executarSoftDelete, 24 * 60 * 60 * 1000);
-    }, 5000);
-})();
-
-// Cria tabela de check-ins manuais de treino (separada da checkin de academia)
-(async () => {
+    // 4. Tabela de check-ins manuais de treino
     try {
         await db.execute(`
             CREATE TABLE IF NOT EXISTS treino_checkins (
@@ -134,13 +83,9 @@ function safeJson(str, fallback) {
                 CONSTRAINT fk_treino_checkin_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
             ) ENGINE=InnoDB
         `);
-    } catch (err) {
-        console.error('[router] initTreinoCheckins:', err.message);
-    }
-})();
+    } catch (err) { console.error('[migration] treino_checkins:', err.message); }
 
-// Cria tabelas de sessão de execução de treino
-(async () => {
+    // 5. Tabelas de sessão de execução de treino
     try {
         await db.execute(`
             CREATE TABLE IF NOT EXISTS treino_sessao (
@@ -169,13 +114,9 @@ function safeJson(str, fallback) {
                 CONSTRAINT fk_tse_sessao FOREIGN KEY (sessao_id) REFERENCES treino_sessao(id) ON DELETE CASCADE
             ) ENGINE=InnoDB
         `);
-    } catch (err) {
-        console.error('[router] initSessaoTables:', err.message);
-    }
-})();
+    } catch (err) { console.error('[migration] treino_sessao:', err.message); }
 
-// Cria tabelas de conquistas e faz seed do catálogo
-(async () => {
+    // 6. Tabelas de conquistas + seed do catálogo
     try {
         await db.execute(`
             CREATE TABLE IF NOT EXISTS conquistas (
@@ -202,7 +143,6 @@ function safeJson(str, fallback) {
                 CONSTRAINT fk_uc_conquista FOREIGN KEY (conquista_id) REFERENCES conquistas(id)
             ) ENGINE=InnoDB
         `);
-        // Seed: insert only if table is empty (slug UNIQUE prevents duplicates)
         await db.execute(`
             INSERT IGNORE INTO conquistas (slug,nome,descricao,categoria,tier,icone,meta_valor,meta_tipo) VALUES
             ('braco-bronze','Braço de Macarrão','Registrou 20kg em exercício de braço','braco','bronze','💪',20,'peso'),
@@ -249,13 +189,9 @@ function safeJson(str, fallback) {
             ('ia-dieta','Nutri Bro','Gerou o primeiro plano de dieta com IA','ia','bronze','🤖',1,'booleano'),
             ('ia-avaliacao','Corpo Analisado','Realizou a primeira avaliação corporal','ia','prata','🤖',1,'booleano')
         `);
-    } catch (err) {
-        console.error('[router] initConquistas:', err.message);
-    }
-})();
+    } catch (err) { console.error('[migration] conquistas:', err.message); }
 
-// Cria tabela de registro nutricional diário
-(async () => {
+    // 7. Tabela de registro nutricional diário
     try {
         await db.execute(`
             CREATE TABLE IF NOT EXISTS nutrition_log (
@@ -274,29 +210,24 @@ function safeJson(str, fallback) {
                 CONSTRAINT fk_nl_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
             ) ENGINE=InnoDB
         `);
-    } catch (err) {
-        console.error('[router] initNutritionLog:', err.message);
-    }
-})();
+    } catch (err) { console.error('[migration] nutrition_log:', err.message); }
 
-// Adiciona colunas extras à nutrition_log se ainda não existirem
-(async () => {
-    const cols = [
+    // 8. Colunas extras de nutrition_log
+    for (const sql of [
         'ALTER TABLE nutrition_log ADD COLUMN proteina_g DECIMAL(6,1) NOT NULL DEFAULT 0 AFTER kcal',
         'ALTER TABLE nutrition_log ADD COLUMN carbs_g DECIMAL(6,1) NOT NULL DEFAULT 0 AFTER proteina_g',
         'ALTER TABLE nutrition_log ADD COLUMN gordura_g DECIMAL(6,1) NOT NULL DEFAULT 0 AFTER carbs_g',
         'ALTER TABLE nutrition_log ADD COLUMN fibra_g DECIMAL(6,1) NOT NULL DEFAULT 0 AFTER gordura_g',
-        'ALTER TABLE nutrition_log ADD COLUMN refeicao_tipo ENUM(\'cafe\',\'almoco\',\'jantar\',\'lanche\',\'outro\') NOT NULL DEFAULT \'outro\' AFTER refeicao',
+        "ALTER TABLE nutrition_log ADD COLUMN refeicao_tipo ENUM('cafe','almoco','jantar','lanche','outro') NOT NULL DEFAULT 'outro' AFTER refeicao",
         'ALTER TABLE nutrition_log ADD COLUMN foto_url VARCHAR(500) DEFAULT NULL',
         'ALTER TABLE nutrition_log ADD COLUMN data DATE GENERATED ALWAYS AS (DATE(registrado_em)) STORED',
         'ALTER TABLE nutrition_log ADD INDEX idx_nl_user_data2 (user_id, data)',
-    ];
-    for (const sql of cols) {
+    ]) {
         try { await db.execute(sql); }
-        catch (err) { if (err.errno !== 1060 && err.errno !== 1061 && err.errno !== 1054) console.error('[nutrition_log alter]', err.message); }
+        catch (err) { if (err.errno !== 1060 && err.errno !== 1061 && err.errno !== 1054) console.error('[migration] nutrition_log extra:', err.message); }
     }
-})();
-(async () => {
+
+    // 9. Coluna nutricao_objetivo (via INFORMATION_SCHEMA para idempotência)
     try {
         const [[col]] = await db.execute(`
             SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
@@ -309,17 +240,13 @@ function safeJson(str, fallback) {
                 "ALTER TABLE `user` ADD COLUMN nutricao_objetivo ENUM('cutting','manutencao','bulking') DEFAULT NULL"
             );
         }
-    } catch (err) {
-        console.error('[router] nutricao_objetivo:', err.message);
-    }
-})();
-(async () => {
-    try { await db.execute('ALTER TABLE nutrition_log ADD COLUMN horario TIME DEFAULT NULL'); }
-    catch (err) { if (err.errno !== 1060) console.error('[router] nutrition_log horario:', err.message); }
-})();
+    } catch (err) { console.error('[migration] nutricao_objetivo:', err.message); }
 
-// Cria tabela de itens individuais de refeição
-(async () => {
+    // 10. Coluna horario em nutrition_log
+    try { await db.execute('ALTER TABLE nutrition_log ADD COLUMN horario TIME DEFAULT NULL'); }
+    catch (err) { if (err.errno !== 1060) console.error('[migration] nutrition_log horario:', err.message); }
+
+    // 11. Tabela de itens individuais de refeição
     try {
         await db.execute(`
             CREATE TABLE IF NOT EXISTS nutrition_item (
@@ -339,15 +266,95 @@ function safeJson(str, fallback) {
                 CONSTRAINT fk_ni_log FOREIGN KEY (log_id) REFERENCES nutrition_log(id) ON DELETE CASCADE
             ) ENGINE=InnoDB
         `);
-    } catch (err) { if (err.errno !== 1050) console.error('[nutrition_item]', err.message); }
-})();
+    } catch (err) { if (err.errno !== 1050) console.error('[migration] nutrition_item:', err.message); }
 
-(async () => {
+    // 12. Adiciona valor 'taco' ao ENUM fonte de nutrition_item
     try {
         await db.execute(
             "ALTER TABLE nutrition_item MODIFY COLUMN fonte ENUM('usda','openfoodfacts','ia','manual','taco') NOT NULL DEFAULT 'manual'"
         );
-    } catch (err) { if (err.errno !== 1060) console.error('[nutrition_item alter fonte]', err.message); }
+    } catch (err) { if (err.errno !== 1060) console.error('[migration] nutrition_item fonte:', err.message); }
+
+    // 13. F6/F9 — Equipamentos, vínculos de exercício e scans de QR
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS equipamento (
+                id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                nome           VARCHAR(100) NOT NULL,
+                descricao      VARCHAR(255) NULL,
+                grupo_muscular ENUM('peito','costas','ombro','braco','perna','core','cardio','outro') NOT NULL DEFAULT 'outro',
+                academia_id    INT UNSIGNED NULL,
+                qr_token       VARCHAR(36) NOT NULL UNIQUE,
+                ativo          TINYINT(1) NOT NULL DEFAULT 1,
+                created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                CONSTRAINT fk_eq_academia FOREIGN KEY (academia_id) REFERENCES gym(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB
+        `);
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS equipamento_exercicio (
+                id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                equipamento_id INT UNSIGNED NOT NULL,
+                exercise_id    INT UNSIGNED NOT NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_eq_ex (equipamento_id, exercise_id),
+                CONSTRAINT fk_eqex_eq FOREIGN KEY (equipamento_id) REFERENCES equipamento(id) ON DELETE CASCADE,
+                CONSTRAINT fk_eqex_ex FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB
+        `);
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS equipamento_scan (
+                id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                equipamento_id INT UNSIGNED NOT NULL,
+                user_id        INT UNSIGNED NULL,
+                created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                INDEX idx_scan_eq (equipamento_id, created_at),
+                CONSTRAINT fk_scan_eq   FOREIGN KEY (equipamento_id) REFERENCES equipamento(id) ON DELETE CASCADE,
+                CONSTRAINT fk_scan_user FOREIGN KEY (user_id)        REFERENCES user(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB
+        `);
+    } catch (err) { if (err.errno !== 1050) console.error('[migration] F6 equipamento tables:', err.message); }
+})();
+
+// Soft delete cron — anonimiza contas com deletion_scheduled_at vencido (a cada 24h)
+(async () => {
+    async function executarSoftDelete() {
+        try {
+            const [contas] = await db.execute(
+                "SELECT id FROM user WHERE status='pendente_exclusao' AND deletion_scheduled_at <= NOW()"
+            );
+            for (const conta of contas) {
+                await db.execute(`
+                    UPDATE user SET
+                        nome               = 'Usuário Removido',
+                        email              = CONCAT('deleted_', id, '@gymbros.removed'),
+                        cpf                = CONCAT('deleted_', id),
+                        senha_hash         = '',
+                        profile_photo      = NULL,
+                        bio                = NULL,
+                        instagram_username = NULL,
+                        username           = NULL,
+                        deleted_at         = NOW(),
+                        status             = 'inativo',
+                        webauthn_enabled   = 0,
+                        webauthn_credential_id = NULL,
+                        webauthn_public_key    = NULL
+                    WHERE id = ?
+                `, [conta.id]);
+                await db.execute('DELETE FROM nutrition_log WHERE user_id=?',  [conta.id]).catch(() => {});
+                await db.execute('DELETE FROM imc_profile  WHERE user_id=?',  [conta.id]).catch(() => {});
+                await db.execute('DELETE FROM body_photo   WHERE user_id=?',  [conta.id]).catch(() => {});
+            }
+            if (contas.length > 0) console.log(`[soft-delete] ${contas.length} conta(s) anonimizadas`);
+        } catch (err) {
+            console.error('[soft-delete cron]', err.message);
+        }
+    }
+    setTimeout(() => {
+        executarSoftDelete();
+        setInterval(executarSoftDelete, 24 * 60 * 60 * 1000);
+    }, 5000);
 })();
 
 // ── Multer: upload de foto de perfil ──────────────────────────────────────────
@@ -742,6 +749,58 @@ router.get('/faq', (req, res) => res.render('pages/faq', { user: req.session.use
     ogTitle:       'Perguntas Frequentes — GymBros',
     ogDescription: 'Tire suas dúvidas sobre o GymBros: planos, academias, pagamentos e mais.',
 }}));
+
+// F6 — Scanner de QR Code
+router.get('/scan', requireAuth, (req, res) => {
+    res.render('pages/scan', {
+        user: req.session.user,
+        seo: { title: 'Escanear Equipamento — GymBros', robots: 'noindex' },
+    });
+});
+
+// F6 — Página do equipamento (requer login)
+router.get('/equipamento/:qr_token', requireAuth, async (req, res) => {
+    try {
+        const [[equipamento]] = await db.execute(
+            `SELECT e.*, g.nome AS academia_nome
+             FROM equipamento e
+             LEFT JOIN gym g ON g.id = e.academia_id
+             WHERE e.qr_token = ? AND e.ativo = 1`,
+            [req.params.qr_token]
+        );
+        if (!equipamento) return res.status(404).render('pages/404', { user: req.session.user });
+
+        const [exercicios] = await db.execute(`
+            SELECT ex.id, ex.name, ex.name_pt, ex.target_muscle, ex.body_part,
+                   em.cloudinary_gif_url AS gif_url
+            FROM equipamento_exercicio ee
+            JOIN exercises ex ON ex.id = ee.exercise_id
+            LEFT JOIN exercise_media em ON em.exercise_id = ex.id
+            WHERE ee.equipamento_id = ?
+            ORDER BY ex.name ASC
+        `, [equipamento.id]);
+
+        // F9 — registrar scan
+        await db.execute(
+            'INSERT INTO equipamento_scan (equipamento_id, user_id) VALUES (?, ?)',
+            [equipamento.id, req.session.user.id]
+        ).catch(() => {});
+
+        res.render('pages/equipamento', {
+            user: req.session.user,
+            equipamento,
+            exercicios,
+            seo: {
+                title:       `${equipamento.nome} — GymBros`,
+                robots:      'noindex',
+                description: `Exercícios no ${equipamento.nome} com GIFs de execução.`,
+            },
+        });
+    } catch (err) {
+        console.error('[equipamento]', err.message);
+        res.redirect('/area-aluno');
+    }
+});
 
 // Área do Aluno (protegida — requer plano ativo)
 router.get('/area-aluno', requirePlano, async (req, res) => {
