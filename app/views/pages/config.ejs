@@ -464,7 +464,20 @@ async function cadastrarBiometria() {
         }
     } catch (err) {
         console.error(err);
-        showToast('Erro ao cadastrar biometria: ' + err.message, 'erro');
+        const msg = err.name === 'NotAllowedError'
+            ? 'Biometria não reconhecida. Mantenha o dedo por mais tempo e tente novamente.'
+            : err.name === 'InvalidStateError'
+            ? 'Esta biometria já está cadastrada neste dispositivo.'
+            : err.name === 'NotSupportedError'
+            ? 'Seu dispositivo não suporta autenticação biométrica.'
+            : err.name === 'SecurityError'
+            ? 'Erro de segurança. Certifique-se de estar acessando via HTTPS.'
+            : err.name === 'AbortError'
+            ? 'Autenticação cancelada. Tente novamente.'
+            : err.name === 'UnknownError'
+            ? 'Erro desconhecido. Tente manter o dedo sobre o sensor por mais tempo.'
+            : 'Erro ao cadastrar biometria. Tente novamente.';
+        showToast(msg, 'erro');
     }
 }
 
@@ -534,7 +547,14 @@ async function confirmarExclusaoBio() {
         const verData = await verRes.json();
         if (!verData.ok) { showToast('Verificação biométrica falhou.', 'erro'); return; }
         await solicitarExclusao({ webauthn_verificado: true });
-    } catch (err) { showToast('Erro na biometria: ' + err.message, 'erro'); }
+    } catch (err) {
+        const msg = err.name === 'NotAllowedError'
+            ? 'Digital não reconhecida. Mantenha o dedo por mais tempo.'
+            : err.name === 'AbortError'
+            ? 'Verificação cancelada.'
+            : 'Erro na biometria. Tente novamente.';
+        showToast(msg, 'erro');
+    }
 }
 
 async function solicitarExclusao(payload) {

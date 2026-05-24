@@ -2607,7 +2607,7 @@ router.post('/api/webauthn/registro/verificar', requireAuth, async (req, res) =>
         res.json({ ok: true });
     } catch (err) {
         console.error('[webauthn/registro/verificar]', err.message);
-        res.status(500).json({ erro: 'Erro ao verificar registro.' });
+        res.status(500).json({ erro: 'Erro ao verificar registro: ' + err.message });
     }
 });
 

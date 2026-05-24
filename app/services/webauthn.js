@@ -37,13 +37,19 @@ async function gerarOpcoesRegistro(user) {
 }
 
 async function verificarRegistro(response, expectedChallenge) {
-    return verifyRegistrationResponse({
-        response,
-        expectedChallenge,
-        expectedOrigin:          ORIGIN,
-        expectedRPID:            RP_ID,
-        requireUserVerification: true,
-    });
+    try {
+        const result = await verifyRegistrationResponse({
+            response,
+            expectedChallenge,
+            expectedOrigin:          ORIGIN,
+            expectedRPID:            RP_ID,
+            requireUserVerification: true,
+        });
+        return result;
+    } catch (err) {
+        console.error('[webauthn/verificarRegistro] erro:', err.message, err.stack);
+        throw err;
+    }
 }
 
 async function gerarOpcoesAutenticacao(user) {
