@@ -410,6 +410,141 @@ router.put('/configuracoes', async (req, res) => {
     }
 });
 
+// ── Busca de exercícios (usada pelo painel de equipamentos) ───────────────────
+router.get('/exercicios', async (req, res) => {
+    try {
+        const q = (req.query.q || '').trim();
+        const equipId = req.query.equipamento_id;
+        if (equipId) {
+            const [rows] = await db.execute(`
+                SELECT ex.id, ex.name, ex.name_pt, ex.target_muscle
+                FROM equipamento_exercicio ee
+                JOIN exercises ex ON ex.id = ee.exercise_id
+                WHERE ee.equipamento_id = ?
+                ORDER BY ex.name ASC
+            `, [equipId]);
+            return res.json(rows);
+        }
+        if (!q) return res.json([]);
+        const [rows] = await db.execute(
+            `SELECT id, name, name_pt, target_muscle FROM exercises
+             WHERE name LIKE ? OR name_pt LIKE ?
+             ORDER BY name ASC LIMIT 30`,
+            [`%${q}%`, `%${q}%`]
+        );
+        res.json(rows);
+    } catch (err) { res.status(500).json([]); }
+});
+
+// ── F6/F9 — Equipamentos ────────────────────────────────────────────────────────
+
+router.get('/equipamentos', async (req, res) => {
+    try {
+        const [rows] = await db.execute(`
+            SELECT e.*, g.nome AS academia_nome,
+                   COUNT(DISTINCT ee.id) AS total_exercicios,
+                   COUNT(DISTINCT es.id) AS total_scans
+            FROM equipamento e
+            LEFT JOIN gym g ON g.id = e.academia_id
+            LEFT JOIN equipamento_exercicio ee ON ee.equipamento_id = e.id
+            LEFT JOIN equipamento_scan es ON es.equipamento_id = e.id
+            GROUP BY e.id ORDER BY e.nome ASC
+        `);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ erro: 'Erro ao buscar equipamentos.' }); }
+});
+
+router.post('/equipamentos', async (req, res) => {
+    const { nome, descricao, grupo_muscular, academia_id, exercise_ids } = req.body;
+    if (!nome) return res.status(400).json({ erro: 'Nome obrigatório.' });
+    try {
+        const qr_token = require('crypto').randomUUID();
+        const [result] = await db.execute(
+            'INSERT INTO equipamento (nome, descricao, grupo_muscular, academia_id, qr_token) VALUES (?, ?, ?, ?, ?)',
+            [nome, descricao || null, grupo_muscular || 'outro', academia_id || null, qr_token]
+        );
+        const equipId = result.insertId;
+        if (Array.isArray(exercise_ids) && exercise_ids.length) {
+            for (const exId of exercise_ids) {
+                await db.execute(
+                    'INSERT IGNORE INTO equipamento_exercicio (equipamento_id, exercise_id) VALUES (?, ?)',
+                    [equipId, exId]
+                );
+            }
+        }
+        const [[novo]] = await db.execute('SELECT * FROM equipamento WHERE id = ?', [equipId]);
+        res.status(201).json({ mensagem: 'Equipamento criado.', equipamento: novo });
+    } catch (err) {
+        console.error('[admin/equipamentos POST]', err.message);
+        res.status(500).json({ erro: 'Erro ao criar equipamento.' });
+    }
+});
+
+router.put('/equipamentos/:id', async (req, res) => {
+    const { nome, descricao, grupo_muscular, academia_id, ativo, exercise_ids } = req.body;
+    try {
+        await db.execute(
+            'UPDATE equipamento SET nome=?, descricao=?, grupo_muscular=?, academia_id=?, ativo=? WHERE id=?',
+            [nome, descricao || null, grupo_muscular, academia_id || null, ativo ?? 1, req.params.id]
+        );
+        if (Array.isArray(exercise_ids)) {
+            await db.execute('DELETE FROM equipamento_exercicio WHERE equipamento_id=?', [req.params.id]);
+            for (const exId of exercise_ids) {
+                await db.execute(
+                    'INSERT IGNORE INTO equipamento_exercicio (equipamento_id, exercise_id) VALUES (?, ?)',
+                    [req.params.id, exId]
+                );
+            }
+        }
+        res.json({ mensagem: 'Equipamento atualizado.' });
+    } catch (err) { res.status(500).json({ erro: 'Erro ao atualizar equipamento.' }); }
+});
+
+router.get('/equipamentos/:id/qr', async (req, res) => {
+    try {
+        const [[eq]] = await db.execute('SELECT qr_token, nome FROM equipamento WHERE id=?', [req.params.id]);
+        if (!eq) return res.status(404).json({ erro: 'Equipamento não encontrado.' });
+        const url = `${process.env.WEBAUTHN_ORIGIN || 'https://gymbros.app.br'}/equipamento/${eq.qr_token}`;
+        const QRCode = require('qrcode');
+        const png = await QRCode.toBuffer(url, {
+            width: 400, margin: 2,
+            color: { dark: '#000000', light: '#ffffff' },
+        });
+        res.set({
+            'Content-Type': 'image/png',
+            'Content-Disposition': `attachment; filename="qr-${eq.nome.replace(/\s+/g, '-')}.png"`,
+        });
+        res.send(png);
+    } catch (err) {
+        console.error('[admin/equipamentos/qr]', err.message);
+        res.status(500).json({ erro: 'Erro ao gerar QR.' });
+    }
+});
+
+router.get('/equipamentos/:id/metricas', async (req, res) => {
+    try {
+        const [[eq]] = await db.execute('SELECT id, nome FROM equipamento WHERE id=?', [req.params.id]);
+        if (!eq) return res.status(404).json({ erro: 'Equipamento não encontrado.' });
+        const [[{ total_scans }]] = await db.execute(
+            'SELECT COUNT(*) AS total_scans FROM equipamento_scan WHERE equipamento_id=?', [req.params.id]
+        );
+        const [por_dia] = await db.execute(`
+            SELECT DATE(created_at) AS dia, COUNT(*) AS scans
+            FROM equipamento_scan WHERE equipamento_id=?
+            AND created_at >= CURDATE() - INTERVAL 7 DAY
+            GROUP BY DATE(created_at) ORDER BY dia ASC
+        `, [req.params.id]);
+        const [top_horarios] = await db.execute(`
+            SELECT HOUR(created_at) AS hora, COUNT(*) AS scans
+            FROM equipamento_scan WHERE equipamento_id=?
+            GROUP BY HOUR(created_at) ORDER BY scans DESC LIMIT 5
+        `, [req.params.id]);
+        res.json({ equipamento: eq, total_scans, por_dia, top_horarios });
+    } catch (err) { res.status(500).json({ erro: 'Erro ao buscar métricas.' }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 router.post('/configuracoes/senha', async (req, res) => {
     const { senhaAtual, novaSenha } = req.body;
     try {

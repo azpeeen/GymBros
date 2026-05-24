@@ -488,4 +488,19 @@ router.get('/configuracoes', async (req, res) => {
     }
 });
 
+// F6 — Gerenciamento de equipamentos
+router.get('/equipamentos', async (req, res) => {
+    try {
+        const [tc] = await db.execute("SELECT COUNT(*) AS cnt FROM support_ticket WHERE status != 'resolvido'");
+        const adminConfig = buildAdminConfig(res.locals.config);
+        res.render('pages/admin-equipamentos', {
+            ticketCount: tc[0].cnt, adminConfig,
+            title: 'Equipamentos', page: 'equipamentos', admin: req.session.admin,
+        });
+    } catch (err) {
+        console.error('[admin/equipamentos]', err);
+        res.status(500).send('Erro ao carregar equipamentos.');
+    }
+});
+
 module.exports = router;
