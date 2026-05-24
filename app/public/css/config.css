@@ -6,18 +6,13 @@
 .cfg-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 1.5rem;
+    gap: 20px;
     align-items: stretch;
     width: 100%;
 }
 
-/* Lembretes — linha 3, largura total, centralizado */
-#cfg-lembretes {
-    grid-column: 1 / -1;
-    max-width: 600px;
-    width: 100%;
-    margin-inline: auto;
-}
+#cfg-lembretes { grid-column: auto; }
+#cfg-avancado  { grid-column: auto; }
 
 /* ─── Card base ──────────────────────────────────────── */
 .cfg-card {
@@ -333,11 +328,35 @@ body.light-mode .cfg-danger-btn i     { color: #F2F0EE; }
 }
 body.light-mode .cfg-card-desc { color: #888; }
 
+/* ─── Segurança Avançada ──────────────────────────────── */
+.cfg-avancado-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+.cfg-avancado-info { flex: 1; min-width: 0; }
+.cfg-avancado-titulo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+#bio-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
 /* ─── Responsive ─────────────────────────────────────── */
-@media (max-width: 860px) {
+@media (max-width: 900px) {
     .cfg-grid { grid-template-columns: 1fr; }
-    #cfg-lembretes { max-width: 100%; }
 }
 @media (max-width: 600px) {
     .cfg-card { padding: 1.25rem; }
+    .cfg-avancado-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }

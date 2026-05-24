@@ -12,6 +12,7 @@ const { gerarBoletoPDF } = require('../services/pdf');
 const conquistas  = require('../services/conquistas');
 const { calcularMetas }   = require('../services/nutricao');
 const { searchAlimento }  = require('../services/foodSearch');
+const webauthn            = require('../services/webauthn');
 const db          = require('../config/db');
 const User        = require('../models/User');
 const Plan        = require('../models/Plan');
@@ -57,6 +58,67 @@ function safeJson(str, fallback) {
     } catch (err) {
         if (err.errno !== 1061) console.error('[router] idx_username:', err.message);
     }
+})();
+
+// Colunas de soft delete e WebAuthn
+(async () => {
+    const cols = [
+        "ALTER TABLE user ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL",
+        "ALTER TABLE user ADD COLUMN deletion_scheduled_at TIMESTAMP NULL DEFAULT NULL",
+        "ALTER TABLE user ADD COLUMN webauthn_credential_id VARCHAR(500) NULL DEFAULT NULL",
+        "ALTER TABLE user ADD COLUMN webauthn_public_key TEXT NULL DEFAULT NULL",
+        "ALTER TABLE user ADD COLUMN webauthn_counter INT UNSIGNED NOT NULL DEFAULT 0",
+        "ALTER TABLE user ADD COLUMN webauthn_enabled TINYINT(1) NOT NULL DEFAULT 0",
+    ];
+    for (const sql of cols) {
+        try { await db.execute(sql); }
+        catch (err) { if (err.errno !== 1060) console.error('[F16 alter user]', err.message); }
+    }
+    try {
+        await db.execute(
+            "ALTER TABLE user MODIFY COLUMN status ENUM('ativo','inativo','pendente_exclusao') NOT NULL DEFAULT 'ativo'"
+        );
+    } catch (err) { if (err.errno !== 1060) console.error('[F16 status enum]', err.message); }
+})();
+
+// Soft delete cron — anonimiza contas com deletion_scheduled_at vencido (a cada 24h)
+(async () => {
+    async function executarSoftDelete() {
+        try {
+            const [contas] = await db.execute(
+                "SELECT id FROM user WHERE status='pendente_exclusao' AND deletion_scheduled_at <= NOW()"
+            );
+            for (const conta of contas) {
+                await db.execute(`
+                    UPDATE user SET
+                        nome               = 'Usuário Removido',
+                        email              = CONCAT('deleted_', id, '@gymbros.removed'),
+                        cpf                = CONCAT('deleted_', id),
+                        senha_hash         = '',
+                        profile_photo      = NULL,
+                        bio                = NULL,
+                        instagram_username = NULL,
+                        username           = NULL,
+                        deleted_at         = NOW(),
+                        status             = 'inativo',
+                        webauthn_enabled   = 0,
+                        webauthn_credential_id = NULL,
+                        webauthn_public_key    = NULL
+                    WHERE id = ?
+                `, [conta.id]);
+                await db.execute('DELETE FROM nutrition_log WHERE user_id=?',  [conta.id]).catch(() => {});
+                await db.execute('DELETE FROM imc_profile  WHERE user_id=?',  [conta.id]).catch(() => {});
+                await db.execute('DELETE FROM body_photo   WHERE user_id=?',  [conta.id]).catch(() => {});
+            }
+            if (contas.length > 0) console.log(`[soft-delete] ${contas.length} conta(s) anonimizadas`);
+        } catch (err) {
+            console.error('[soft-delete cron]', err.message);
+        }
+    }
+    setTimeout(() => {
+        executarSoftDelete();
+        setInterval(executarSoftDelete, 24 * 60 * 60 * 1000);
+    }, 5000);
 })();
 
 // Cria tabela de check-ins manuais de treino (separada da checkin de academia)
@@ -1417,10 +1479,20 @@ router.get('/meu-plano', requirePlano, async (req, res) => {
 router.get('/config', requireAuth, async (req, res) => {
     try {
         const [rows] = await db.execute(
-            'SELECT notification_interval_days FROM user WHERE id = ?',
+            'SELECT notification_interval_days, webauthn_enabled, deletion_scheduled_at, status FROM user WHERE id = ?',
             [req.session.user.id]
         );
-        req.session.user.notification_interval_days = rows[0]?.notification_interval_days ?? 7;
+        if (rows[0]) {
+            req.session.user.notification_interval_days = rows[0].notification_interval_days ?? 7;
+            req.session.user.webauthn_enabled           = rows[0].webauthn_enabled ?? 0;
+            req.session.user.deletion_scheduled_at      = rows[0].deletion_scheduled_at || null;
+            req.session.user.status                     = rows[0].status;
+            if (rows[0].status === 'pendente_exclusao' && rows[0].deletion_scheduled_at) {
+                req.session.user.diasRestantesExclusao = Math.ceil(
+                    (new Date(rows[0].deletion_scheduled_at) - Date.now()) / 86400000
+                );
+            }
+        }
     } catch (_) { /* mantém valor da sessão se houver */ }
 
     res.render('pages/config', { user: req.session.user,
@@ -2009,6 +2081,10 @@ router.post('/login',
             data: new Date(avalRow.created_at).toLocaleDateString('pt-BR'),
         } : null;
 
+        const diasRestantesExclusao = (user.status === 'pendente_exclusao' && user.deletion_scheduled_at)
+            ? Math.ceil((new Date(user.deletion_scheduled_at) - Date.now()) / 86400000)
+            : null;
+
         req.session.user = {
             id:                         user.id,
             nome:                       user.nome,
@@ -2019,6 +2095,9 @@ router.post('/login',
             planoSlug:                  plano?.slug  || null,
             profile_photo:              user.profile_photo || null,
             status:                     user.status,
+            deletion_scheduled_at:      user.deletion_scheduled_at      || null,
+            diasRestantesExclusao,
+            webauthn_enabled:           user.webauthn_enabled           || 0,
             last_imc_update:            user.last_imc_update            || null,
             last_avaliacao_update:      user.last_avaliacao_update      || null,
             notification_interval_days: user.notification_interval_days || 7,
@@ -2484,6 +2563,179 @@ router.delete('/api/nutricao/:id', requirePlano, async (req, res) => {
     } catch (err) {
         console.error('[api/nutricao/delete]', err);
         res.status(500).json({ erro: 'Erro ao excluir registro.' });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// WEBAUTHN — registro de biometria
+// ══════════════════════════════════════════════════════════════════
+
+router.get('/api/webauthn/registro/opcoes', requireAuth, async (req, res) => {
+    try {
+        const opcoes = await webauthn.gerarOpcoesRegistro(req.session.user);
+        req.session.webauthnChallenge = opcoes.challenge;
+        res.json(opcoes);
+    } catch (err) {
+        console.error('[webauthn/registro/opcoes]', err.message);
+        res.status(500).json({ erro: 'Erro ao gerar opções de registro.' });
+    }
+});
+
+router.post('/api/webauthn/registro/verificar', requireAuth, async (req, res) => {
+    try {
+        const expectedChallenge = req.session.webauthnChallenge;
+        if (!expectedChallenge) return res.status(400).json({ erro: 'Challenge expirado.' });
+
+        const verificacao = await webauthn.verificarRegistro(req.body, expectedChallenge);
+        if (!verificacao.verified) return res.status(400).json({ erro: 'Verificação falhou.' });
+
+        // v9+: registrationInfo.credential.{id, publicKey, counter}
+        const { id: credentialID, publicKey: credentialPublicKey, counter } = verificacao.registrationInfo.credential;
+
+        await db.execute(
+            'UPDATE user SET webauthn_credential_id=?, webauthn_public_key=?, webauthn_counter=?, webauthn_enabled=1 WHERE id=?',
+            [
+                credentialID,                                          // base64url string
+                Buffer.from(credentialPublicKey).toString('base64'),   // standard base64
+                counter,
+                req.session.user.id,
+            ]
+        );
+
+        req.session.webauthnChallenge    = null;
+        req.session.user.webauthn_enabled = 1;
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[webauthn/registro/verificar]', err.message);
+        res.status(500).json({ erro: 'Erro ao verificar registro.' });
+    }
+});
+
+router.post('/api/webauthn/registro/remover', requireAuth, async (req, res) => {
+    try {
+        await db.execute(
+            'UPDATE user SET webauthn_enabled=0, webauthn_credential_id=NULL, webauthn_public_key=NULL, webauthn_counter=0 WHERE id=?',
+            [req.session.user.id]
+        );
+        req.session.user.webauthn_enabled = 0;
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[webauthn/registro/remover]', err.message);
+        res.status(500).json({ erro: 'Erro ao remover biometria.' });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// WEBAUTHN — autenticação por biometria
+// ══════════════════════════════════════════════════════════════════
+
+router.get('/api/webauthn/auth/opcoes', requireAuth, async (req, res) => {
+    try {
+        const [[userRow]] = await db.execute(
+            'SELECT webauthn_credential_id, webauthn_enabled FROM user WHERE id=?',
+            [req.session.user.id]
+        );
+        if (!userRow?.webauthn_enabled) return res.status(400).json({ erro: 'Biometria não cadastrada.' });
+        const opcoes = await webauthn.gerarOpcoesAutenticacao(userRow);
+        req.session.webauthnChallenge = opcoes.challenge;
+        res.json(opcoes);
+    } catch (err) {
+        console.error('[webauthn/auth/opcoes]', err.message);
+        res.status(500).json({ erro: 'Erro ao gerar opções de autenticação.' });
+    }
+});
+
+router.post('/api/webauthn/auth/verificar', requireAuth, async (req, res) => {
+    try {
+        const expectedChallenge = req.session.webauthnChallenge;
+        if (!expectedChallenge) return res.status(400).json({ erro: 'Challenge expirado.' });
+
+        const [[userRow]] = await db.execute(
+            'SELECT webauthn_public_key, webauthn_counter FROM user WHERE id=?',
+            [req.session.user.id]
+        );
+
+        const verificacao = await webauthn.verificarAutenticacao(
+            req.body,
+            expectedChallenge,
+            userRow.webauthn_public_key,
+            userRow.webauthn_counter,
+        );
+        if (!verificacao.verified) return res.status(400).json({ erro: 'Autenticação falhou.' });
+
+        await db.execute(
+            'UPDATE user SET webauthn_counter=? WHERE id=?',
+            [verificacao.authenticationInfo.newCounter, req.session.user.id]
+        );
+
+        req.session.webauthnChallenge = null;
+        res.json({ ok: true, verificado: true });
+    } catch (err) {
+        console.error('[webauthn/auth/verificar]', err.message);
+        res.status(500).json({ erro: 'Erro ao verificar autenticação.' });
+    }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// CONTA — exclusão com soft delete
+// ══════════════════════════════════════════════════════════════════
+
+router.get('/api/conta/info-exclusao', requireAuth, async (req, res) => {
+    try {
+        const plano = await User.getActivePlan(req.session.user.id);
+        res.json({
+            temPlanoAtivo: !!plano,
+            planoNome:     plano?.nome   || null,
+            planoExpira:   plano?.expira_em || null,
+        });
+    } catch (err) {
+        console.error('[conta/info-exclusao]', err.message);
+        res.status(500).json({ erro: 'Erro ao buscar informações.' });
+    }
+});
+
+router.post('/api/conta/solicitar-exclusao', requireAuth, async (req, res) => {
+    const uid = req.session.user.id;
+    const { senha, webauthn_verificado } = req.body;
+
+    try {
+        if (!webauthn_verificado) {
+            if (!senha) return res.status(400).json({ erro: 'Confirmação obrigatória.' });
+            const [[userRow]] = await db.execute('SELECT senha_hash FROM user WHERE id=?', [uid]);
+            const ok = await bcrypt.compare(senha, userRow.senha_hash);
+            if (!ok) return res.status(401).json({ erro: 'Senha incorreta.' });
+        }
+
+        const deletion_scheduled_at = new Date();
+        deletion_scheduled_at.setDate(deletion_scheduled_at.getDate() + 30);
+
+        await db.execute(
+            "UPDATE user SET status='pendente_exclusao', deletion_scheduled_at=? WHERE id=?",
+            [deletion_scheduled_at, uid]
+        );
+
+        req.session.user.status                = 'pendente_exclusao';
+        req.session.user.deletion_scheduled_at = deletion_scheduled_at;
+        res.json({ ok: true, deletion_scheduled_at });
+    } catch (err) {
+        console.error('[conta/solicitar-exclusao]', err.message);
+        res.status(500).json({ erro: 'Erro ao agendar exclusão.' });
+    }
+});
+
+router.post('/api/conta/cancelar-exclusao', requireAuth, async (req, res) => {
+    try {
+        await db.execute(
+            "UPDATE user SET status='ativo', deletion_scheduled_at=NULL WHERE id=?",
+            [req.session.user.id]
+        );
+        req.session.user.status                = 'ativo';
+        req.session.user.deletion_scheduled_at = null;
+        req.session.user.diasRestantesExclusao = null;
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[conta/cancelar-exclusao]', err.message);
+        res.status(500).json({ erro: 'Erro ao cancelar exclusão.' });
     }
 });
 

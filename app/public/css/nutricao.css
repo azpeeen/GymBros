@@ -792,3 +792,16 @@ body.light-mode .nutri-pag-btn:hover { border-color: #C98B1D; color: #C98B1D; }
     .nutri-quantidade-row { flex-direction: column; }
     .nutri-preview-grid { justify-content: center; }
 }
+
+@media (max-width: 768px) {
+    .nutri-macros        { gap: 10px; padding: 16px; }
+    .nutri-macro-bar     { gap: 6px; }
+    .nutri-agua-card     { padding: 16px; margin-bottom: 12px; }
+    .nutri-insight-card  { margin-bottom: 12px; padding: 12px 14px; }
+    .nutri-refeicao-grupo { margin-bottom: 8px; }
+    .nutri-refeicao-header { padding: 14px 14px; }
+    .nutri-refeicao-itens  { padding: 0 14px; }
+    .nutri-item-linha    { padding: 10px 0; }
+    .nutri-aderencia     { padding: 16px; }
+    .aluno-main          { padding: 16px 12px; gap: 12px; }
+}

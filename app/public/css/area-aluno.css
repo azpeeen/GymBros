@@ -1610,4 +1610,104 @@ body.light-mode .plano-card-destaque .plano-card-btn i { color: #000; } /* hover
     cursor: pointer;
     transition: all 0.2s;
 }
+
+/* ── F16: Banner de exclusão pendente ─────────────────────────── */
+.banner-exclusao-pendente {
+    background: rgba(231,76,60,.12);
+    border-bottom: 2px solid rgba(231,76,60,.4);
+    color: #e74c3c;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: .85rem;
+    font-weight: 600;
+    flex-wrap: wrap;
+}
+.btn-cancelar-exclusao {
+    margin-left: auto;
+    padding: 6px 16px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: .8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* ── F16: Biometria ───────────────────────────────────────────── */
+.btn-bio-cadastrar {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 20px; border-radius: 8px;
+    background: rgba(255,215,0,.12); border: 1px solid rgba(255,215,0,.3);
+    color: #FFD700; font-weight: 700; font-size: .875rem; cursor: pointer;
+    transition: background .2s;
+}
+.btn-bio-cadastrar:hover { background: rgba(255,215,0,.22); }
+.btn-bio-remover {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px; border-radius: 8px;
+    background: transparent; border: 1px solid #444;
+    color: #888; font-size: .82rem; cursor: pointer; margin-top: 8px;
+    transition: all .2s;
+}
+.btn-bio-remover:hover { border-color: #e74c3c; color: #e74c3c; }
+.bio-ativo { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: #22c55e; }
+.bio-hint  { font-size: .75rem; color: #666; margin-top: 6px; }
+
+/* ── F16: Botão excluir conta ─────────────────────────────────── */
+.btn-excluir-conta {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(231,76,60,.4);
+    background: rgba(231,76,60,.08); color: #e74c3c;
+    font-weight: 700; font-size: .875rem; cursor: pointer; transition: all .2s;
+}
+.btn-excluir-conta:hover { background: rgba(231,76,60,.18); }
+
+/* ── F16: Modal de exclusão ───────────────────────────────────── */
+.modal-exclusao-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.75); z-index: 99999;
+    align-items: center; justify-content: center;
+}
+.modal-exclusao-overlay.open { display: flex; }
+.modal-exclusao-box {
+    background: #1f1f1f; border: 1px solid #2a2a2a;
+    border-radius: 16px; padding: 32px; max-width: 420px;
+    width: 90%; animation: modalPop .25s ease;
+}
+.modal-exclusao-title {
+    font-size: 1.1rem; font-weight: 800; color: #e74c3c;
+    margin: 0 0 16px; display: flex; align-items: center; gap: 10px;
+}
+.modal-exclusao-aviso {
+    background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.25);
+    border-radius: 8px; padding: 12px 14px; font-size: .82rem;
+    color: #F59E0B; margin-bottom: 14px; display: flex; gap: 8px; align-items: flex-start;
+}
+.modal-exclusao-desc   { font-size: .85rem; color: #aaa; margin-bottom: 12px; }
+.modal-exclusao-metodos { display: flex; flex-direction: column; gap: 10px; }
+.btn-confirmar-bio {
+    display: flex; align-items: center; gap: 8px;
+    padding: 11px 18px; border-radius: 8px;
+    background: rgba(255,215,0,.1); border: 1px solid rgba(255,215,0,.3);
+    color: #FFD700; font-weight: 700; cursor: pointer; transition: background .2s;
+}
+.btn-confirmar-bio:hover { background: rgba(255,215,0,.2); }
+.modal-exclusao-btns {
+    display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;
+}
+.btn-cancelar-modal {
+    padding: 10px 20px; border-radius: 8px; border: 1px solid #444;
+    background: transparent; color: #888; cursor: pointer; transition: all .2s;
+}
+.btn-cancelar-modal:hover { border-color: #666; color: #fff; }
+.btn-confirmar-exclusao {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 20px; border-radius: 8px; border: none;
+    background: #e74c3c; color: #fff; font-weight: 700; cursor: pointer;
+    transition: background .2s;
+}
+.btn-confirmar-exclusao:hover { background: #c0392b; }
 .logout-btn-confirm:hover { background: #c0392b; }
