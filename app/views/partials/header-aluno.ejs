@@ -148,3 +148,13 @@
 })();
 </script>
 <%- include('./logout-modal') %>
+<% if (locals.user && user.status === 'pendente_exclusao') { %>
+<section class="banner-exclusao-pendente">
+    <i class="fas fa-triangle-exclamation"></i>
+    Sua conta está agendada para exclusão em <strong><%= user.diasRestantesExclusao ?? 30 %> dia(s)</strong>.
+    <strong>Cancele antes que o prazo expire.</strong>
+    <button onclick="cancelarExclusao()" class="btn-cancelar-exclusao">
+        Cancelar exclusão
+    </button>
+</section>
+<% } %>

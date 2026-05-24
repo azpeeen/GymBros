@@ -271,8 +271,121 @@
                 <p class="cfg-feedback" id="lembretesFeedback"></p>
             </section>
 
+            <!-- ── CARD SEGURANÇA AVANÇADA ─────────────────── -->
+            <section class="cfg-card" id="cfg-avancado">
+                <header class="cfg-card-header">
+                    <span class="cfg-card-icon"><i class="fas fa-shield-halved"></i></span>
+                    <h2>Segurança Avançada</h2>
+                </header>
+
+                <!-- Biometria -->
+                <section class="cfg-avancado-row">
+                    <section class="cfg-avancado-info">
+                        <section class="cfg-avancado-titulo">
+                            <i class="fas fa-fingerprint" style="color:#FFD700"></i>
+                            <strong>Login por Biometria</strong>
+                        </section>
+                        <p class="cfg-card-desc" style="margin:4px 0 0">
+                            Use a digital ou Face ID para confirmar ações sensíveis no app.
+                        </p>
+                    </section>
+                    <section id="bio-status">
+                        <% if (user.webauthn_enabled) { %>
+                        <section class="bio-ativo">
+                            <i class="fas fa-circle-check" style="color:#22c55e"></i>
+                            Ativa
+                        </section>
+                        <button class="btn-bio-remover" onclick="removerBiometria()">
+                            <i class="fas fa-trash"></i> Remover
+                        </button>
+                        <% } else { %>
+                        <button class="btn-bio-cadastrar" onclick="cadastrarBiometria()">
+                            <i class="fas fa-fingerprint"></i> Cadastrar biometria
+                        </button>
+                        <% } %>
+                    </section>
+                </section>
+
+                <!-- Divisor -->
+                <section style="border-top: 1px solid rgba(231,76,60,.15); margin: 20px 0;"></section>
+
+                <!-- Excluir conta -->
+                <section class="cfg-avancado-row">
+                    <section class="cfg-avancado-info">
+                        <section class="cfg-avancado-titulo">
+                            <i class="fas fa-triangle-exclamation" style="color:#e74c3c"></i>
+                            <strong style="color:#e74c3c">Excluir conta</strong>
+                        </section>
+                        <p class="cfg-card-desc" style="margin:4px 0 0">
+                            Sua conta ficará agendada para remoção em <strong>30 dias</strong>.
+                            Você pode cancelar fazendo login durante esse período.
+                        </p>
+                    </section>
+                    <section>
+                        <% if (user.status === 'pendente_exclusao') { %>
+                        <section style="font-size:.8rem;color:#e74c3c;margin-bottom:8px;">
+                            <i class="fas fa-clock"></i>
+                            <strong><%= user.diasRestantesExclusao ?? 30 %> dia(s) restante(s)</strong>
+                        </section>
+                        <button class="btn-excluir-conta" style="border-color:rgba(34,197,94,.4);color:#22c55e" onclick="cancelarExclusao()">
+                            <i class="fas fa-rotate-left"></i> Cancelar exclusão
+                        </button>
+                        <% } else { %>
+                        <button class="btn-excluir-conta" onclick="abrirModalExclusao()">
+                            <i class="fas fa-trash-alt"></i> Excluir minha conta
+                        </button>
+                        <% } %>
+                    </section>
+                </section>
+            </section>
+
         </section><!-- /cfg-grid -->
 
+    </section>
+</section>
+
+<!-- ── MODAL DE EXCLUSÃO ──────────────────────────────────────── -->
+<section class="modal-exclusao-overlay" id="modalExclusao">
+    <section class="modal-exclusao-box">
+        <h3 class="modal-exclusao-title">
+            <i class="fas fa-triangle-exclamation"></i>
+            Excluir conta
+        </h3>
+
+        <section id="aviso-plano" style="display:none" class="modal-exclusao-aviso"></section>
+
+        <p class="modal-exclusao-desc">
+            Sua conta será agendada para exclusão em <strong>30 dias</strong>.
+            Você pode cancelar fazendo login durante esse período.
+        </p>
+        <p class="modal-exclusao-desc" style="color:#e74c3c;font-size:.82rem;">
+            Todos os seus dados pessoais serão removidos permanentemente após 30 dias.
+        </p>
+
+        <section class="modal-exclusao-confirmacao">
+            <p style="font-size:.82rem;color:#888;margin-bottom:12px;">
+                Confirme sua identidade para prosseguir:
+            </p>
+            <section class="modal-exclusao-metodos">
+                <% if (user.webauthn_enabled) { %>
+                <button class="btn-confirmar-bio" onclick="confirmarExclusaoBio()">
+                    <i class="fas fa-fingerprint"></i> Usar biometria
+                </button>
+                <% } %>
+                <section class="modal-exclusao-senha">
+                    <input type="password" id="senha-exclusao" class="cfg-field input"
+                           placeholder="Ou digite sua senha"
+                           style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #333;background:#141414;color:#fff;font-size:.9rem;">
+                </section>
+            </section>
+        </section>
+
+        <section class="modal-exclusao-btns">
+            <button class="btn-cancelar-modal" onclick="fecharModalExclusao()">Cancelar</button>
+            <button class="btn-confirmar-exclusao" onclick="confirmarExclusaoSenha()">
+                <i class="fas fa-trash-alt"></i> Excluir conta
+            </button>
+        </section>
     </section>
 </section>
 
@@ -280,5 +393,180 @@
 <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 <script src="/js/config.js"></script>
+<script>
+// ── Cadastrar biometria ───────────────────────────────────────────────────────
+async function cadastrarBiometria() {
+    if (!window.PublicKeyCredential) {
+        alert('Seu dispositivo não suporta autenticação biométrica.');
+        return;
+    }
+    try {
+        const opcoesRes = await fetch('/api/webauthn/registro/opcoes');
+        const opcoes    = await opcoesRes.json();
+        if (opcoes.erro) { alert(opcoes.erro); return; }
+
+        opcoes.challenge = base64ToBuffer(opcoes.challenge);
+        opcoes.user.id   = base64ToBuffer(opcoes.user.id);
+        if (opcoes.excludeCredentials) {
+            opcoes.excludeCredentials = opcoes.excludeCredentials.map(c => ({
+                ...c, id: base64ToBuffer(c.id)
+            }));
+        }
+
+        const credential = await navigator.credentials.create({ publicKey: opcoes });
+        const credJSON   = credentialToJSON(credential);
+
+        const verRes  = await fetch('/api/webauthn/registro/verificar', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(credJSON),
+        });
+        const verData = await verRes.json();
+        if (verData.ok) {
+            alert('Biometria cadastrada com sucesso!');
+            location.reload();
+        } else {
+            alert('Erro: ' + (verData.erro || 'Falha no registro.'));
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Erro ao cadastrar biometria: ' + err.message);
+    }
+}
+
+// ── Remover biometria ─────────────────────────────────────────────────────────
+async function removerBiometria() {
+    if (!confirm('Deseja remover a biometria deste dispositivo?')) return;
+    try {
+        const res  = await fetch('/api/webauthn/registro/remover', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) { alert('Biometria removida.'); location.reload(); }
+        else alert(data.erro || 'Erro ao remover biometria.');
+    } catch (err) { alert('Erro: ' + err.message); }
+}
+
+// ── Modal de exclusão ─────────────────────────────────────────────────────────
+async function abrirModalExclusao() {
+    document.getElementById('modalExclusao').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    try {
+        const res  = await fetch('/api/conta/info-exclusao');
+        const data = await res.json();
+        const aviso = document.getElementById('aviso-plano');
+        if (data.temPlanoAtivo) {
+            const expira = data.planoExpira
+                ? new Date(data.planoExpira).toLocaleDateString('pt-BR')
+                : 'data não definida';
+            aviso.innerHTML = `<i class="fas fa-info-circle"></i>
+                Você tem o plano <strong>${data.planoNome}</strong> ativo até <strong>${expira}</strong>.
+                Ao excluir, perderá o acesso imediatamente. Não haverá reembolso proporcional.`;
+            aviso.style.display = 'flex';
+        }
+    } catch (_) {}
+}
+
+function fecharModalExclusao() {
+    document.getElementById('modalExclusao').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+async function confirmarExclusaoSenha() {
+    const senha = document.getElementById('senha-exclusao').value;
+    if (!senha) { alert('Digite sua senha para confirmar.'); return; }
+    await solicitarExclusao({ senha });
+}
+
+async function confirmarExclusaoBio() {
+    try {
+        const opcoesRes = await fetch('/api/webauthn/auth/opcoes');
+        const opcoes    = await opcoesRes.json();
+        if (opcoes.erro) { alert(opcoes.erro); return; }
+        opcoes.challenge = base64ToBuffer(opcoes.challenge);
+        if (opcoes.allowCredentials) {
+            opcoes.allowCredentials = opcoes.allowCredentials.map(c => ({
+                ...c, id: base64ToBuffer(c.id)
+            }));
+        }
+        const assertion  = await navigator.credentials.get({ publicKey: opcoes });
+        const assertJSON = credentialToJSON(assertion);
+        const verRes  = await fetch('/api/webauthn/auth/verificar', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(assertJSON),
+        });
+        const verData = await verRes.json();
+        if (!verData.ok) { alert('Verificação biométrica falhou.'); return; }
+        await solicitarExclusao({ webauthn_verificado: true });
+    } catch (err) { alert('Erro na biometria: ' + err.message); }
+}
+
+async function solicitarExclusao(payload) {
+    try {
+        const res  = await fetch('/api/conta/solicitar-exclusao', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            alert('Conta agendada para exclusão em 30 dias. Você ainda pode cancelar fazendo login.');
+            location.href = '/logout';
+        } else {
+            alert(data.erro || 'Erro ao solicitar exclusão.');
+        }
+    } catch (err) { alert('Erro: ' + err.message); }
+}
+
+async function cancelarExclusao() {
+    try {
+        const res  = await fetch('/api/conta/cancelar-exclusao', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+            alert('Exclusão cancelada. Sua conta está ativa novamente.');
+            location.reload();
+        }
+    } catch (err) { alert('Erro ao cancelar exclusão.'); }
+}
+
+// ── Helpers WebAuthn ──────────────────────────────────────────────────────────
+function base64ToBuffer(base64) {
+    const b = base64.replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(b);
+    const buffer = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
+    return buffer.buffer;
+}
+
+function bufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary  = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function credentialToJSON(credential) {
+    if (credential.response) {
+        const response = {};
+        for (const key of Object.keys(Object.getPrototypeOf(credential.response))) {
+            const val = credential.response[key];
+            if (typeof val === 'function') continue;
+            response[key] = val instanceof ArrayBuffer ? bufferToBase64(val) : val;
+        }
+        return {
+            id:       credential.id,
+            rawId:    bufferToBase64(credential.rawId),
+            type:     credential.type,
+            response,
+            clientExtensionResults: credential.getClientExtensionResults?.() || {},
+        };
+    }
+    return credential;
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('modalExclusao')?.addEventListener('click', function(e) {
+    if (e.target === this) fecharModalExclusao();
+});
+</script>
 </body>
 </html>

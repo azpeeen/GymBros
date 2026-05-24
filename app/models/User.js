@@ -22,16 +22,16 @@ class User {
         return rows[0] || null;
     }
 
-    // Tenta CPF → email → nome, filtrando apenas usuários ativos
+    // Tenta CPF → email → nome, filtrando apenas usuários ativos ou pendente_exclusao
     static async findActiveByIdentifier(identifier) {
         const cpfNorm = identifier.replace(/\D/g, '');
         if (/^\d{11}$/.test(cpfNorm)) {
-            const [r] = await db.execute("SELECT * FROM user WHERE cpf = ? AND status = 'ativo'", [cpfNorm]);
+            const [r] = await db.execute("SELECT * FROM user WHERE cpf = ? AND status IN ('ativo','pendente_exclusao')", [cpfNorm]);
             if (r[0]) return r[0];
         }
-        const [r2] = await db.execute("SELECT * FROM user WHERE email = ? AND status = 'ativo'", [identifier.toLowerCase()]);
+        const [r2] = await db.execute("SELECT * FROM user WHERE email = ? AND status IN ('ativo','pendente_exclusao')", [identifier.toLowerCase()]);
         if (r2[0]) return r2[0];
-        const [r3] = await db.execute("SELECT * FROM user WHERE nome = ? AND status = 'ativo'", [identifier]);
+        const [r3] = await db.execute("SELECT * FROM user WHERE nome = ? AND status IN ('ativo','pendente_exclusao')", [identifier]);
         return r3[0] || null;
     }
 
