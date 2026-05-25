@@ -36,50 +36,6 @@ function checkRateLimit(userId, key, max, windowMs) {
 // Planos gymbro e black têm acesso à IA
 const requireIA = requirePlanLevel(['gymbro', 'black']);
 
-// Cria tabelas de planos IA se não existirem
-async function initPlanTables() {
-    await db.execute(`
-        CREATE TABLE IF NOT EXISTS workout_plans (
-            id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            user_id         INT UNSIGNED NOT NULL,
-            nome            VARCHAR(255) NOT NULL,
-            descricao       TEXT NULL,
-            exercicios_json JSON NOT NULL,
-            criado_por_ia   TINYINT(1) NOT NULL DEFAULT 0,
-            created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY uq_workout_plan_user_nome (user_id, nome),
-            CONSTRAINT fk_workout_plans_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB
-    `);
-    await db.execute(`
-        CREATE TABLE IF NOT EXISTS diet_plans (
-            id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            user_id           INT UNSIGNED NOT NULL,
-            nome              VARCHAR(255) NOT NULL,
-            objetivo_calorico INT UNSIGNED NULL,
-            proteina_diaria_g INT UNSIGNED NULL,
-            refeicoes_json    JSON NOT NULL,
-            criado_por_ia     TINYINT(1) NOT NULL DEFAULT 0,
-            created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY uq_diet_plan_user_nome (user_id, nome),
-            CONSTRAINT fk_diet_plans_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB
-    `);
-}
-initPlanTables().catch(err => console.error('[ai] initPlanTables:', err.message));
-
-// Adiciona coluna context_summary à ai_session se ainda não existir (errno 1060 = duplicate column)
-(async () => {
-    try {
-        await db.execute('ALTER TABLE ai_session ADD COLUMN context_summary TEXT NULL');
-    } catch (err) {
-        if (err.errno !== 1060) console.error('[ai] alter ai_session:', err.message);
-    }
-})();
 
 // Cache de exercícios do banco — expira em 24h
 let _exerciseCache    = null;
