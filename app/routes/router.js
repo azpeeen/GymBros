@@ -85,6 +85,43 @@ function safeJson(str, fallback) {
         `);
     } catch (err) { console.error('[migration] treino_checkins:', err.message); }
 
+    // 4b. Tabelas de planos IA (devem existir antes de treino_sessao que tem FK para workout_plans)
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS workout_plans (
+                id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id         INT UNSIGNED NOT NULL,
+                nome            VARCHAR(255) NOT NULL,
+                descricao       TEXT NULL,
+                exercicios_json JSON NOT NULL,
+                criado_por_ia   TINYINT(1) NOT NULL DEFAULT 0,
+                created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_workout_plan_user_nome (user_id, nome),
+                CONSTRAINT fk_workout_plans_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB
+        `);
+    } catch (err) { if (err.errno !== 1050) console.error('[migration] workout_plans:', err.message); }
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS diet_plans (
+                id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id           INT UNSIGNED NOT NULL,
+                nome              VARCHAR(255) NOT NULL,
+                objetivo_calorico INT UNSIGNED NULL,
+                proteina_diaria_g INT UNSIGNED NULL,
+                refeicoes_json    JSON NOT NULL,
+                criado_por_ia     TINYINT(1) NOT NULL DEFAULT 0,
+                created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_diet_plan_user_nome (user_id, nome),
+                CONSTRAINT fk_diet_plans_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB
+        `);
+    } catch (err) { if (err.errno !== 1050) console.error('[migration] diet_plans:', err.message); }
+
     // 5. Tabelas de sessão de execução de treino
     try {
         await db.execute(`
@@ -335,6 +372,13 @@ function safeJson(str, fallback) {
         );
     } catch (err) {
         if (err.errno !== 1826) console.error('[F6 add fk_eqex_ex]', err.message);
+    }
+
+    // 15. context_summary em ai_session
+    try {
+        await db.execute('ALTER TABLE ai_session ADD COLUMN context_summary TEXT NULL');
+    } catch (err) {
+        if (err.errno !== 1060) console.error('[migration] ai_session context_summary:', err.message);
     }
 })();
 
