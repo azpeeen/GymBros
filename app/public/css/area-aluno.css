@@ -1711,3 +1711,8 @@ body.light-mode .plano-card-destaque .plano-card-btn i { color: #000; } /* hover
 }
 .btn-confirmar-exclusao:hover { background: #c0392b; }
 .logout-btn-confirm:hover { background: #c0392b; }
+
+.sidebar-scan-item { display: none; }
+@media (max-width: 768px) {
+    .sidebar-scan-item { display: block; }
+}
