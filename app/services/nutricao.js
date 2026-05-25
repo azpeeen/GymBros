@@ -49,16 +49,26 @@ function calcularMetas(imc) {
     let kcalMeta, protFator;
     if (obj.includes('perder') || obj.includes('emagrecer') || obj.includes('cutting') || obj.includes('definir')) {
         kcalMeta  = Math.round(tdee * 0.85);
-        protFator = 2.2;
+        protFator = 1.8;
     } else if (obj.includes('ganhar') || obj.includes('massa') || obj.includes('bulking') || obj.includes('hipertrofia')) {
         kcalMeta  = Math.round(tdee * 1.10);
-        protFator = 1.8;
+        protFator = 2.0;
     } else {
         kcalMeta  = tdee;
         protFator = 1.6;
     }
 
-    const proteina  = Math.round(peso * protFator);
+    const altM          = altCm / 100;
+    const altPolegadas  = altCm / 2.54;
+    const pesoIdeal     = (sexo === 'masculino' || sexo === 'm' || sexo === 'male')
+        ? 50   + 2.3 * Math.max(0, altPolegadas - 60)
+        : 45.5 + 2.3 * Math.max(0, altPolegadas - 60);
+    const imcReal         = peso / (altM * altM);
+    const pesoParaProtein = imcReal > 25
+        ? Math.round(pesoIdeal + 0.25 * (peso - pesoIdeal))
+        : peso;
+
+    const proteina  = Math.round(pesoParaProtein * protFator);
     const kcalProt  = proteina * 4;
     const gordura   = Math.round((kcalMeta * 0.25) / 9);
     const kcalGord  = gordura * 9;
