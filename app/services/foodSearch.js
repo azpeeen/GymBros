@@ -24,7 +24,12 @@ function cacheSet(key, data) {
 // ── HTTP com timeout ──────────────────────────────────────────────────────────
 function httpGet(url, timeoutMs = 4500) {
     return new Promise((resolve, reject) => {
-        const req = https.get(url, res => {
+        const req = https.get(url, {
+            headers: {
+                'User-Agent': 'GymBros/1.0 (gymbros.app.br; gymbros.tcc@gmail.com)',
+                'Accept': 'application/json',
+            }
+        }, res => {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {

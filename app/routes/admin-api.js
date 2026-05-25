@@ -438,6 +438,32 @@ router.get('/exercicios', async (req, res) => {
 
 // ── F6/F9 — Equipamentos ────────────────────────────────────────────────────────
 
+router.get('/equipamentos/exercicios', async (req, res) => {
+    try {
+        const equipments = Array.isArray(req.query.equipment)
+            ? req.query.equipment
+            : req.query.equipment ? [req.query.equipment] : [];
+
+        if (!equipments.length) return res.json({ exercicios: [] });
+
+        const placeholders = equipments.map(() => '?').join(',');
+        const [exercicios] = await db.execute(`
+            SELECT e.id, e.name, e.name_pt, e.body_part, e.target_muscle, e.equipment_name,
+                   em.cloudinary_gif_url AS gif_url
+            FROM exercises e
+            LEFT JOIN exercise_media em ON em.exercise_id = e.id
+            WHERE e.equipment_name IN (${placeholders})
+              AND e.body_part IS NOT NULL
+            ORDER BY e.body_part ASC, e.name ASC
+        `, equipments);
+
+        res.json({ exercicios });
+    } catch (err) {
+        console.error('[admin/equipamentos/exercicios]', err.message);
+        res.status(500).json({ erro: 'Erro ao buscar exercícios.' });
+    }
+});
+
 router.get('/equipamentos', async (req, res) => {
     try {
         const [rows] = await db.execute(`

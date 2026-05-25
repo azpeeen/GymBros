@@ -295,7 +295,7 @@ function safeJson(str, fallback) {
             CREATE TABLE IF NOT EXISTS equipamento_exercicio (
                 id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 equipamento_id INT UNSIGNED NOT NULL,
-                exercise_id    INT UNSIGNED NOT NULL,
+                exercise_id    VARCHAR(50) NOT NULL,
                 PRIMARY KEY (id),
                 UNIQUE KEY uq_eq_ex (equipamento_id, exercise_id),
                 CONSTRAINT fk_eqex_eq FOREIGN KEY (equipamento_id) REFERENCES equipamento(id) ON DELETE CASCADE,
@@ -315,6 +315,27 @@ function safeJson(str, fallback) {
             ) ENGINE=InnoDB
         `);
     } catch (err) { if (err.errno !== 1050) console.error('[migration] F6 equipamento tables:', err.message); }
+
+    // 14. Fix: exercise_id em equipamento_exercicio deve ser VARCHAR(50) para referenciar exercises.id
+    try {
+        await db.execute('ALTER TABLE equipamento_exercicio DROP FOREIGN KEY fk_eqex_ex');
+    } catch (err) {
+        if (err.errno !== 1091) console.error('[F6 drop fk_eqex_ex]', err.message);
+    }
+    try {
+        await db.execute(
+            'ALTER TABLE equipamento_exercicio MODIFY COLUMN exercise_id VARCHAR(50) NOT NULL'
+        );
+    } catch (err) {
+        if (err.errno !== 1060) console.error('[F6 alter equipamento_exercicio]', err.message);
+    }
+    try {
+        await db.execute(
+            'ALTER TABLE equipamento_exercicio ADD CONSTRAINT fk_eqex_ex FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE'
+        );
+    } catch (err) {
+        if (err.errno !== 1826) console.error('[F6 add fk_eqex_ex]', err.message);
+    }
 })();
 
 // Soft delete cron — anonimiza contas com deletion_scheduled_at vencido (a cada 24h)
