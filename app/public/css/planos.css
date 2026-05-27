@@ -111,7 +111,6 @@ a {
     box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
 }
 
-.card-starter { background: #cfcfcf; color: #1f1f1f; }
 .card-gymbro { background: #C5A349; color: #1f1f1f; }
 .card-black { background: #000; color: #fff; }
 
@@ -160,10 +159,6 @@ a {
     margin-left: -1em;
     position: absolute;
     left: 0;
-}
-
-.starter .plan-features li:before {
-    color: #cfcfcf;
 }
 
 .gymbro .plan-features li:before {

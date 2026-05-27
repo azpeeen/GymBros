@@ -95,10 +95,6 @@ main a {
 }
 
 /* Tipos de planos */
-.plan-card.starter {
-    border-top: 5px solid #cfcfcf;
-}
-
 .plan-card.gymbro {
     border-top: 5px solid #C5A349;
 }
@@ -153,10 +149,6 @@ main a {
     margin-left: -1em;
     position: absolute;
     left: 0;
-}
-
-.starter .plan-features li:before {
-    color: #cfcfcf;
 }
 
 .gymbro .plan-features li:before {
