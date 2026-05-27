@@ -321,9 +321,8 @@ CREATE TABLE favorite_gym (
 -- ============================================================================
 
 -- ─── plan ───────────────────────────────────────────────────────────────────
--- ATENÇÃO: os IDs gerados serão 1, 2, 3 (auto_increment).
--- O código requirePlanLevel.js usa 'pl001','pl002','pl003' — precisará ser
--- atualizado para comparar planoSlug ('starter','gymbro','black') em vez de planoId.
+-- ATENÇÃO: os IDs gerados serão 1, 2 (auto_increment).
+-- requirePlanLevel.js usa planoSlug: 'gymbro' | 'black'.
 CREATE TABLE plan (
   id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
   slug            VARCHAR(40) NOT NULL UNIQUE,    -- chave de negócio usada no código
@@ -1000,24 +999,16 @@ INSERT INTO admin_user (nome, email, senha_hash, role) VALUES
 
 
 -- Planos
--- CORREÇÃO v1.2.0: 'free' renomeado para 'starter' (slug usado no código).
--- Preços alinhados com PLANOS_PAGAMENTO em router.js.
--- IDs gerados: starter=1, gymbro=2, black=3.
--- ATENÇÃO: requirePlanLevel.js deve ser atualizado para checar planoSlug
---          em vez de planoId ('pl002'/'pl003' → 'gymbro'/'black').
+-- Slugs válidos: 'gymbro' | 'black'
 INSERT INTO plan (slug, nome, descricao, preco, duracao_dias, beneficios, permite_ia, permite_avaliacao_corporal, ordem) VALUES
-  ('starter', 'Starter', 'Acesso básico à plataforma',
-   64.90, 30,
-   JSON_ARRAY('Treinos manuais ilimitados','Execução de treino com GIFs','Check-in manual de treino','Streak de treinos','Notificações de água e sono'),
-   0, 0, 1),
   ('gymbro', 'GymBro', 'Plano intermediário com IA treinadora',
-   85.60, 30,
-   JSON_ARRAY('Tudo do Starter','IA treinadora personalizada','Plano de treino gerado por IA','Plano de dieta gerado por IA','Histórico completo de conversas IA'),
-   1, 0, 2),
+   29.90, 30,
+   JSON_ARRAY('Treinos manuais + execução com GIFs','IA treinadora personalizada','Plano de treino gerado por IA','Plano de dieta gerado por IA','Histórico completo de conversas IA'),
+   1, 0, 1),
   ('black', 'Black', 'Plano completo com avaliação corporal por IA',
-   145.90, 30,
+   59.90, 30,
    JSON_ARRAY('Tudo do GymBro','Avaliação corporal por foto (IA Vision)','Personal trainer IA exclusivo','Análise avançada de evolução corporal','Suporte prioritário'),
-   1, 1, 3);
+   1, 1, 2);
 
 
 -- Comodidades

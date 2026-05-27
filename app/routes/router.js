@@ -400,12 +400,35 @@ function safeJson(str, fallback) {
         `);
     } catch (err) { if (err.errno !== 1050) console.error('[migration] push_subscriptions:', err.message); }
 
-    // 17. Remover Starter e atualizar preços dos planos
+    // 17. Remover plano Starter e atualizar preços
     try {
-        await db.execute("UPDATE plan SET status='inativo' WHERE slug='starter' AND status='ativo'");
+        const [[starterRow]] = await db.execute("SELECT id FROM plan WHERE slug='starter' LIMIT 1");
+        if (starterRow) {
+            const [[gymbroRow]] = await db.execute("SELECT id FROM plan WHERE slug='gymbro' LIMIT 1");
+            if (gymbroRow) {
+                await db.execute("UPDATE user_plan SET plan_id=? WHERE plan_id=?", [gymbroRow.id, starterRow.id]);
+                await db.execute("UPDATE payment   SET plan_id=? WHERE plan_id=?", [gymbroRow.id, starterRow.id]);
+            }
+            await db.execute("DELETE FROM plan WHERE slug='starter'");
+        }
         await db.execute("UPDATE plan SET preco=29.90 WHERE slug='gymbro' AND preco=85.60");
         await db.execute("UPDATE plan SET preco=59.90 WHERE slug='black' AND preco=145.90");
     } catch (err) { console.error('[migration] planos_update:', err.message); }
+
+    // 18. Atualizar benefícios do GymBro (remover referência ao Starter)
+    try {
+        const gymbroBen = JSON.stringify([
+            'Treinos manuais + execução com GIFs',
+            'IA treinadora personalizada',
+            'Plano de treino gerado por IA',
+            'Plano de dieta gerado por IA',
+            'Histórico completo de conversas IA',
+        ]);
+        await db.execute(
+            "UPDATE plan SET beneficios=? WHERE slug='gymbro' AND JSON_SEARCH(beneficios, 'one', 'Tudo do Starter') IS NOT NULL",
+            [gymbroBen]
+        );
+    } catch (err) { console.error('[migration] gymbro_beneficios:', err.message); }
 })();
 
 // Soft delete cron — anonimiza contas com deletion_scheduled_at vencido (a cada 24h)

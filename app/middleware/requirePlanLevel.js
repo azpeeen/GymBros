@@ -1,6 +1,6 @@
 'use strict';
 
-// planoSlug: 'starter' | 'gymbro' | 'black'
+// planoSlug: 'gymbro' | 'black'
 function requirePlanLevel(slugs) {
     return (req, res, next) => {
         const userSlug = req.session.user?.planoSlug;

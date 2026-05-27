@@ -317,12 +317,7 @@ const dictionary = {
         en: 'You don\'t have an active plan yet. Choose a plan to access the member area.',
         es: 'Aún no tienes un plan activo. Elige un plan para acceder al área del alumno.'
     },
-    'plans.starter.f1': { pt: 'Treinos manuais ilimitados',       en: 'Unlimited manual workouts',     es: 'Entrenamientos manuales ilimitados' },
-    'plans.starter.f2': { pt: 'Execução de treino com GIFs',     en: 'Workout execution with GIFs',   es: 'Ejecución de entrenamiento con GIFs' },
-    'plans.starter.f3': { pt: 'Check-in manual de treino',       en: 'Manual workout check-in',       es: 'Check-in manual de entrenamiento' },
-    'plans.starter.f4': { pt: 'Streak de treinos',               en: 'Workout streak',                es: 'Racha de entrenamientos' },
-    'plans.starter.f5': { pt: 'Notificações de água e sono',     en: 'Water and sleep notifications', es: 'Notificaciones de agua y sueño' },
-    'plans.gymbro.f1':  { pt: 'Tudo do Starter',                 en: 'Everything in Starter',         es: 'Todo lo del Starter' },
+    'plans.gymbro.f1':  { pt: 'Treinos manuais + execução com GIFs', en: 'Manual workouts + GIF execution', es: 'Entrenamientos manuales + ejecución con GIFs' },
     'plans.gymbro.f2':  { pt: 'IA treinadora personalizada',     en: 'Personalized AI trainer',       es: 'IA entrenadora personalizada' },
     'plans.gymbro.f3':  { pt: 'Plano de treino gerado por IA',   en: 'AI-generated workout plan',     es: 'Plan de entrenamiento generado por IA' },
     'plans.gymbro.f4':  { pt: 'Plano de dieta gerado por IA',    en: 'AI-generated diet plan',        es: 'Plan de dieta generado por IA' },

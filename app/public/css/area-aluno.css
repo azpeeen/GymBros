@@ -381,11 +381,6 @@ body {
 }
 
 /* CORES DOS PLANOS */
-.card-starter {
-    background: #cfcfcf;
-    color: #1f1f1f; /* contraste pro texto */
-}
-
 .card-gymbro {
     background: #C5A349;
     color: #1f1f1f;
@@ -450,7 +445,7 @@ body {
 }
 
 /* =========================
-   MENU LOCKED (plano Starter)
+   MENU LOCKED
    ========================= */
 .menu-locked {
     opacity: 0.45;
@@ -716,11 +711,6 @@ body {
     margin-bottom: 1rem;
 }
 
-@media(max-width: 768px){
-    .card-starter{
-        width: 330px;
-    }
-}
 
 /* ==============================
    LIGHT MODE — Área do Aluno
@@ -761,7 +751,7 @@ body.light-mode .dashboard-top h1 { color: #C98B1D; }
 body.light-mode .dashboard-top p  { color: #4E4C4A; }
 
 /* Não sobrescreve cards coloridos de planos */
-body.light-mode .card:not(.card-gymbro):not(.card-starter):not(.card-black) {
+body.light-mode .card:not(.card-gymbro):not(.card-black) {
     background: #E8E6E3;
     color: #1C1A18;
     box-shadow: 0 6px 18px rgba(0,0,0,0.08);
@@ -787,7 +777,6 @@ body.light-mode .recent-activities li { color: #1C1A18; border-bottom-color: #C9
 
 body.light-mode .other-plans h2 { color: #C98B1D; }
 
-body.light-mode .card-starter { background: #C5C3C0; color: #1C1A18; }
 body.light-mode .card-gymbro  { background: #C5A349; color: #1C1A18; }
 body.light-mode .card-black   { background: #2A2826; color: #F2F0EE; }
 
