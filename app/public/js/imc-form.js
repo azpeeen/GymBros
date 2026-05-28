@@ -500,8 +500,12 @@ async function submitForm() {
 
             document.getElementById('submit-success').textContent = '✓ Perfil salvo com sucesso!';
 
-            // Após 1.5s mostra a view do perfil em vez de redirecionar
+            // Após 1.5s redireciona (se servidor enviou redirect) ou mostra view do perfil
             setTimeout(() => {
+                if (data.redirect) {
+                    window.location.href = data.redirect;
+                    return;
+                }
                 renderProfileView(payload);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 // Volta ao passo 1 caso o usuário edite novamente

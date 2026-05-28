@@ -70,6 +70,14 @@
         <!-- WRAPPER DO FORMULÁRIO (oculto quando perfil já está salvo) -->
         <section id="formWrapper">
 
+        <% if (primeiro) { %>
+        <section class="notif-banner notif-info" id="bannerPrimeiro">
+            <i class="fas fa-info-circle"></i>
+            <span>Para personalizar sua experiência no GymBros, complete seu perfil antes de continuar.</span>
+            <button class="notif-fechar" onclick="this.parentElement.remove()" type="button">&times;</button>
+        </section>
+        <% } %>
+
         <!-- BARRA DE PROGRESSO -->
         <section class="imc-progress-wrapper">
             <section class="imc-progress-track">
