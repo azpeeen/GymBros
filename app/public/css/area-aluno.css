@@ -831,6 +831,7 @@ body.light-mode .dash-action-arrow   { color: #aaa; }
 body.light-mode .dash-action-blue .dash-action-icon i   { color: #1E90FF; }
 body.light-mode .dash-action-orange .dash-action-icon i { color: #FF8C00; }
 body.light-mode .dash-action-gold .dash-action-icon i   { color: #C98B1D; }
+body.light-mode .dash-action-green .dash-action-icon i  { color: #16a34a; }
 
 body.light-mode .dash-activities          { background: #E8E6E3; border-color: #C9C7C4; }
 body.light-mode .dash-activities h2       { color: #C98B1D; }
@@ -1271,9 +1272,12 @@ body.light-mode .plano-card-destaque .plano-card-btn i { color: #000; } /* hover
 .dash-action-blue   { border-left: 3px solid #1E90FF; }
 .dash-action-orange { border-left: 3px solid #FF8C00; }
 .dash-action-gold   { border-left: 3px solid #FFD700; }
+.dash-action-green  { border-left: 3px solid #22c55e; }
 .dash-action-blue   .dash-action-icon { background: rgba(30,144,255,0.15); color: #1E90FF; }
 .dash-action-orange .dash-action-icon { background: rgba(255,140,0,0.15);  color: #FF8C00; }
 .dash-action-gold   .dash-action-icon { background: rgba(255,215,0,0.15);  color: #FFD700; }
+.dash-action-green  .dash-action-icon { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.dash-action-qr-mobile { display: none; }
 .dash-action-body  { flex: 1; display: flex; flex-direction: column; }
 .dash-action-title { font-size: 0.95rem; font-weight: 700; color: #fff; }
 .dash-action-sub   { font-size: 0.78rem; color: #888; margin-top: 0.1rem; }
@@ -1419,6 +1423,7 @@ body.light-mode .plano-card-destaque .plano-card-btn i { color: #000; } /* hover
     .dash-action-icon  { width: 36px; height: 36px; font-size: 0.95rem; border-radius: 8px; }
     .dash-action-title { font-size: 0.85rem; }
     .dash-action-sub   { font-size: 0.72rem; }
+    .dash-action-qr-mobile { display: flex; }
 
     .dash-activities,
     .dash-goal-section { padding: 1.1rem 1.2rem; border-radius: 10px; }

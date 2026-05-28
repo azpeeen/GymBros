@@ -918,6 +918,9 @@ router.get('/equipamento/:qr_token', requireAuth, async (req, res) => {
 
 // Área do Aluno (protegida — requer plano ativo)
 router.get('/area-aluno', requirePlano, async (req, res) => {
+    if (!req.session.user.imc) {
+        return res.redirect('/imc-form?primeiro=1');
+    }
     const uid = req.session.user.id;
     try {
         const [[extraRow], [[cqRow]], [[semanaRow]], ultimasConqRows] = await Promise.all([
@@ -1707,6 +1710,7 @@ router.get('/imc-form', requirePlano, async (req, res) => {
         console.error('[imc-form]', err);
     }
     res.render('pages/imc-form', { user: req.session.user, ultimoImc,
+        primeiro: req.query.primeiro === '1',
         seo: { title: 'Meu Perfil IMC — GymBros', canonical: '/imc-form', robots: 'noindex, nofollow', description: 'Perfil IMC personalizado GymBros.' },
     });
 });
@@ -1856,7 +1860,7 @@ router.post('/imc-save', requireAuth, async (req, res) => {
             hidratacao, seletividade, alimentosSeletividade,
         };
 
-        return res.json({ mensagem: 'Perfil salvo com sucesso! Redirecionando...' });
+        return res.json({ mensagem: 'Perfil salvo com sucesso! Redirecionando...', redirect: '/area-aluno' });
     } catch (err) {
         console.error('[imc-save]', err);
         return res.status(500).json({ erro: 'Erro ao salvar perfil.' });
