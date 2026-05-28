@@ -396,12 +396,10 @@ async function searchAlimento(query, lang = 'pt') {
     tacoResults = searchTaco(query);
 
     if (temMapa || (staple && tacoResults.length >= 1)) {
-        // Staple com mapa ou com resultado TACO → OFF desligado
         const [usda] = await Promise.allSettled([searchUSDA(query, 6)]);
         usdaResults = usda.status === 'fulfilled' ? usda.value : [];
         offResults  = [];
     } else {
-        // Produto industrial sem mapa → OFF com filtro de idioma
         const [usda, off] = await Promise.allSettled([
             searchUSDA(query, 4),
             searchOFF(query, lang, 6),
@@ -409,13 +407,20 @@ async function searchAlimento(query, lang = 'pt') {
         usdaResults = usda.status === 'fulfilled' ? usda.value : [];
         if (off.status === 'fulfilled') {
             offResults = filtrarPortugues(off.value, query);
-            // Se o filtro espanhol removeu tudo mas havia produtos, usa filtro mínimo
             if (!offResults.length && off.value.length) {
                 const qw = query.toLowerCase().split(' ').filter(w => w.length > 2);
                 offResults = off.value
                     .filter(r => qw.some(w => r.nome.toLowerCase().includes(w)))
                     .slice(0, 4);
             }
+        }
+    }
+
+    // Fallback: se não achou nada, tenta OFF independente de isStaple
+    if (!tacoResults.length && !usdaResults.length && !offResults.length) {
+        const [off] = await Promise.allSettled([searchOFF(query, lang, 6)]);
+        if (off.status === 'fulfilled') {
+            offResults = off.value.length ? off.value : [];
         }
     }
 
