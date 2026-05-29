@@ -2059,23 +2059,23 @@ router.get('/suporte', requirePlano, (req, res) => {
 
 router.post('/api/suporte/tickets', requireAuth, [
     body('assunto').trim().notEmpty().withMessage('Assunto obrigatório.').isLength({ max: 150 }),
-    body('mensagem').trim().notEmpty().withMessage('Mensagem obrigatória.').isLength({ max: 2000 }),
-    body('categoria').optional().isIn(['bug', 'duvida', 'pagamento', 'outro']),
+    body('descricao').trim().notEmpty().withMessage('Descrição obrigatória.').isLength({ max: 2000 }),
+    body('tipo').optional().isLength({ max: 100 }),
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ erros: errors.array() });
 
-    const { assunto, mensagem, categoria } = req.body;
+    const { assunto, descricao, tipo } = req.body;
     const user = req.session.user;
 
     try {
-        await db.execute(
-            `INSERT INTO ticket (user_id, assunto, mensagem, categoria, status, created_at)
+        const [result] = await db.execute(
+            `INSERT INTO ticket (user_id, assunto, mensagem, tipo, status, created_at)
              VALUES (?, ?, ?, ?, 'aberto', NOW())`,
-            [user.id, assunto, mensagem, categoria || 'outro']
+            [user.id, assunto, descricao, tipo || 'Outro']
         );
         broadcast('novo_ticket', { userId: user.id, nome: user.nome, assunto });
-        return res.json({ ok: true, mensagem: 'Ticket enviado com sucesso!' });
+        return res.json({ ok: true, mensagem: 'Ticket enviado com sucesso!', ticket: { id: result.insertId, assunto, status: 'aberto' } });
     } catch (err) {
         console.error('[suporte/tickets]', err.message);
         return res.status(500).json({ erro: 'Erro ao enviar ticket.' });
