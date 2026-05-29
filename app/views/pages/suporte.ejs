@@ -393,7 +393,7 @@ async function openChat(id, assunto, status) {
     if (_sse) { _sse.close(); _sse = null; }
     if (status !== 'resolvido') {
         _sse = new EventSource('/api/suporte/tickets/' + id + '/stream');
-        _sse.addEventListener('new_message', function(e) {
+        _sse.addEventListener('ticket_message', function(e) {
             const msg = JSON.parse(e.data);
             if (msg.remetente !== 'admin') return;
             showTyping();

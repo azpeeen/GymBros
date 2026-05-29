@@ -470,6 +470,14 @@ function safeJson(str, fallback) {
             ) ENGINE=InnoDB
         `);
     } catch (err) { if (err.errno !== 1050) console.error('[migration] ticket_mensagem:', err.message); }
+
+    try {
+        await db.execute(
+            "ALTER TABLE ticket MODIFY COLUMN status ENUM('aberto','em_atendimento','resolvido','fechado') NOT NULL DEFAULT 'aberto'"
+        );
+    } catch (err) {
+        if (err.errno !== 1060) console.error('[migration] alter ticket status:', err.message);
+    }
 })();
 
 // Soft delete cron — anonimiza contas com deletion_scheduled_at vencido (a cada 24h)
@@ -2161,7 +2169,15 @@ router.post('/api/suporte/tickets/:id/mensagem', requireAuth, async (req, res) =
             'SELECT id, remetente, texto, created_at FROM ticket_mensagem WHERE id = ?',
             [result.insertId]
         );
-        broadcastTicket(ticket.id, 'ticket_mensagem', { ticketId: ticket.id, msg });
+        const payload = {
+            id:         result.insertId,
+            texto:      texto.trim(),
+            remetente:  'user',
+            nome:       req.session.user.nome,
+            created_at: new Date().toISOString(),
+            ticketId:   ticket.id,
+        };
+        broadcastTicket(ticket.id, 'ticket_message', payload);
         res.json({ ...msg, criadaEm: msg.created_at });
     } catch (err) {
         console.error('[suporte/tickets/mensagem]', err.message);
@@ -2188,25 +2204,176 @@ router.get('/api/suporte/tickets/:id/stream', requireAuth, async (req, res) => {
     addTicketClient(ticketId, res);
 });
 
+// Admin — Suporte
+router.get('/admin/suporte', requireAuth, async (req, res) => {
+    const { status } = req.query;
+    try {
+        const where = status ? 'WHERE t.status = ?' : '';
+        const params = status ? [status] : [];
+        const [lista] = await db.execute(`
+            SELECT t.id, t.assunto, t.tipo, t.status, t.created_at,
+                   u.nome AS userName, u.email AS userEmail
+            FROM ticket t
+            JOIN \`user\` u ON u.id = t.user_id
+            ${where}
+            ORDER BY t.created_at DESC
+        `, params);
+
+        const [[{ todos }]]     = await db.execute('SELECT COUNT(*) as todos FROM ticket');
+        const [[{ resolvido }]] = await db.execute("SELECT COUNT(*) as resolvido FROM ticket WHERE status='resolvido'");
+
+        let counts = { aberto: 0, em_atendimento: 0 };
+        try {
+            const [[result]] = await db.execute(
+                "SELECT SUM(status='aberto') as aberto, SUM(status='em_atendimento') as em_atendimento FROM ticket"
+            );
+            counts = result;
+        } catch (_) {}
+        const ticketCount = (counts?.aberto || 0) + (counts?.em_atendimento || 0);
+
+        res.render('pages/admin-suporte', {
+            user:  req.session.user,
+            admin: req.session.user,
+            lista,
+            status: status || null,
+            counts: { todos, aberto: counts.aberto || 0, em_atendimento: counts.em_atendimento || 0, resolvido },
+            page:        'suporte',
+            title:       'Suporte',
+            ticketCount,
+            adminConfig: { version: '1.0.0', maintenance: false },
+        });
+    } catch (err) {
+        console.error('[admin/suporte]', err.message);
+        res.redirect('/admin-dashboard');
+    }
+});
+
+router.get('/admin/suporte/:id', requireAuth, async (req, res) => {
+    try {
+        const [[ticket]] = await db.execute(
+            `SELECT t.*, u.nome AS userName, u.email AS userEmail
+             FROM ticket t JOIN \`user\` u ON u.id = t.user_id
+             WHERE t.id = ?`,
+            [req.params.id]
+        );
+        if (!ticket) return res.redirect('/admin/suporte');
+
+        const ticketUser = { id: ticket.user_id, nome: ticket.userName, email: ticket.userEmail };
+        ticket.prioridade = ticket.prioridade || 'normal';
+        ticket.updated_at = ticket.updated_at || ticket.created_at;
+
+        const [msgs] = await db.execute(
+            'SELECT * FROM ticket_mensagem WHERE ticket_id = ? ORDER BY created_at ASC',
+            [ticket.id]
+        );
+        const [[{ ticketCount }]] = await db.execute(
+            "SELECT COUNT(*) as ticketCount FROM ticket WHERE status='aberto'"
+        );
+
+        res.render('pages/admin-suporte-chat', {
+            user:        ticketUser,
+            admin:       req.session.user,
+            ticket,
+            msgs,
+            page:        'suporte',
+            title:       'Suporte',
+            ticketCount,
+            adminConfig: { version: '1.0.0', maintenance: false },
+        });
+    } catch (err) {
+        console.error('[admin/suporte/:id]', err.message);
+        res.redirect('/admin/suporte');
+    }
+});
+
+router.post('/api/admin/suporte/tickets/:id/mensagem', requireAuth, async (req, res) => {
+    const { texto } = req.body;
+    if (!texto?.trim()) return res.status(400).json({ erro: 'Texto obrigatório.' });
+    try {
+        const [[ticket]] = await db.execute(
+            "SELECT id FROM ticket WHERE id = ? AND status != 'fechado'",
+            [req.params.id]
+        );
+        if (!ticket) return res.status(404).json({ erro: 'Ticket não encontrado.' });
+
+        const [result] = await db.execute(
+            "INSERT INTO ticket_mensagem (ticket_id, remetente, texto) VALUES (?, 'admin', ?)",
+            [ticket.id, texto.trim()]
+        );
+        const [[msg]] = await db.execute(
+            'SELECT * FROM ticket_mensagem WHERE id = ?',
+            [result.insertId]
+        );
+
+        broadcastTicket(parseInt(ticket.id), 'ticket_message', {
+            id:         result.insertId,
+            texto:      texto.trim(),
+            remetente:  'admin',
+            nome:       'Admin',
+            created_at: new Date().toISOString(),
+            ticketId:   parseInt(ticket.id),
+        });
+        res.json({ ...msg, criadaEm: msg.created_at });
+    } catch (err) {
+        console.error('[api/admin/suporte/mensagem]', err.message);
+        res.status(500).json({ erro: 'Erro ao enviar mensagem.' });
+    }
+});
+
+router.get('/api/admin/suporte/tickets/:id/stream', requireAuth, (req, res) => {
+    res.set({
+        'Content-Type':      'text/event-stream',
+        'Cache-Control':     'no-cache',
+        'Connection':        'keep-alive',
+        'X-Accel-Buffering': 'no',
+    });
+    res.write(':ok\n\n');
+    const ticketId = parseInt(req.params.id);
+    addTicketClient(ticketId, res);
+    const ping = setInterval(() => res.write(':ping\n\n'), 20000);
+    req.on('close', () => clearInterval(ping));
+});
+
+router.put('/api/admin/suporte/tickets/:id/status', requireAuth, async (req, res) => {
+    const { status } = req.body;
+    const validos = ['aberto', 'em_atendimento', 'resolvido', 'fechado'];
+    if (!validos.includes(status)) return res.status(400).json({ erro: 'Status inválido.' });
+    try {
+        await db.execute('UPDATE ticket SET status = ? WHERE id = ?', [status, req.params.id]);
+        broadcast('ticket_update', { ticketId: req.params.id, status });
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[api/admin/suporte/status]', err.message);
+        res.status(500).json({ erro: 'Erro ao atualizar status.' });
+    }
+});
+
 //Administração
 router.get('/admin-dashboard', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-dashboard', { user: req.session.user });
+    res.render('pages/admin-dashboard', {
+        user:        req.session.user,
+        admin:       req.session.user,
+        page:        'dashboard',
+        title:       'Dashboard',
+        adminConfig: { version: '1.0.0', maintenance: false },
+        ticketCount: 0,
+    });
 });
 
 //Checkin
 router.get('/admin-checkins', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-checkins', { user: req.session.user });
+    res.render('pages/admin-checkins', { user: req.session.user, admin: req.session.user, page: 'checkins', title: 'Check-ins', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 //Admin Configurações
 router.get('/admin-configuracoes', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-configuracoes', { user: req.session.user });
+    res.render('pages/admin-configuracoes', { user: req.session.user, admin: req.session.user, page: 'configuracoes', title: 'Configurações', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 //Administração Login
@@ -2220,78 +2387,64 @@ router.get('/admin-login', (req, res) => {
 router.get('/admin-academias', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-academias', { user: req.session.user });
+    res.render('pages/admin-academias', { user: req.session.user, admin: req.session.user, page: 'academias', title: 'Academias', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 //Administração Inadimplentes
 router.get('/admin-financeiro-inadimplentes', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-financeiro-inadimplentes', { user: req.session.user });
+    res.render('pages/admin-financeiro-inadimplentes', { user: req.session.user, admin: req.session.user, page: 'financeiro', title: 'Financeiro', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 //Administração Receitas
 router.get('/admin-financeiro-receitas', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-financeiro-receitas', { user: req.session.user });
+    res.render('pages/admin-financeiro-receitas', { user: req.session.user, admin: req.session.user, page: 'financeiro', title: 'Financeiro', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 //Administração Financeiro
 router.get('/admin-financeiro', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-financeiro', { user: req.session.user });
+    res.render('pages/admin-financeiro', { user: req.session.user, admin: req.session.user, page: 'financeiro', title: 'Financeiro', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 //Administração Notificações
 router.get('/admin-notificacoes', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-notificacoes', { user: req.session.user });
+    res.render('pages/admin-notificacoes', { user: req.session.user, admin: req.session.user, page: 'notificacoes', title: 'Notificações', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 //Administração Planos
 router.get('/admin-planos', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-planos', { user: req.session.user });
+    res.render('pages/admin-planos', { user: req.session.user, admin: req.session.user, page: 'planos', title: 'Planos', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 //Administração Relatórios
 router.get('/admin-relatorios', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-relatorios', { user: req.session.user });
+    res.render('pages/admin-relatorios', { user: req.session.user, admin: req.session.user, page: 'relatorios', title: 'Relatórios', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
-
-//Administração Suporte Chat
-router.get('/admin-suporte-chat', (req, res) => {
-    if (!req.session.user) return res.redirect('/login');
-
-    res.render('pages/admin-suporte-chat', { user: req.session.user });
-});
-
-//Administração Suporte
-router.get('/admin-suporte', (req, res) => {
-    if (!req.session.user) return res.redirect('/login');
-
-    res.render('pages/admin-suporte', { user: req.session.user });
-});
 
 //Administração Usuário Perfil
 router.get('/admin-usuario-perfil', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-usuario-perfil', { user: req.session.user });
+    res.render('pages/admin-usuario-perfil', { user: req.session.user, admin: req.session.user, page: 'usuarios', title: 'Usuários', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 //Administração Usuários
 router.get('/admin-usuarios', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    res.render('pages/admin-usuarios', { user: req.session.user });
+    res.render('pages/admin-usuarios', { user: req.session.user, admin: req.session.user, page: 'usuarios', title: 'Usuários', adminConfig: { version: '1.0.0', maintenance: false }, ticketCount: 0 });
 });
 
 // Logout — POST evita logout acidental por crawler/prefetch

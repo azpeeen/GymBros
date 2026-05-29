@@ -184,18 +184,6 @@ if (chatForm) {
 // Reutiliza a conexão SSE já aberta pelo admin.js (window._adminSSE)
 // em vez de criar uma nova conexão para o endpoint do aluno (que retornaria 401)
 if (window._adminSSE) {
-    window._adminSSE.addEventListener('ticket_message', function(e) {
-        const d = JSON.parse(e.data);
-        if (String(d.ticketId) !== String(TICKET_ID)) return; // outro ticket
-        showTyping();
-        setTimeout(() => {
-            hideTyping();
-            appendBubble({ texto: d.texto, remetente: 'usuario', criadaEm: new Date().toISOString() }, 'usuario', true);
-            scrollChat();
-            toast('Nova mensagem de <%= user.nome %>', 'info', 2500);
-        }, 500);
-    });
-
     window._adminSSE.addEventListener('ticket_update', function(e) {
         const d = JSON.parse(e.data);
         if (String(d.ticketId) !== String(TICKET_ID)) return;
@@ -211,6 +199,17 @@ if (window._adminSSE) {
         document.getElementById('realtime-status').textContent = 'Conectado ao chat';
     });
 }
+
+// SSE ticket-específico: admin recebe mensagens do aluno via broadcastTicket
+const _ticketId  = TICKET_ID;
+const _ticketSSE = new EventSource(`/api/admin/suporte/tickets/${_ticketId}/stream`);
+_ticketSSE.addEventListener('ticket_message', (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.remetente === 'admin') return; // já renderizado otimisticamente
+    appendBubble({ texto: msg.texto, criadaEm: msg.created_at }, 'usuario', true);
+    scrollChat();
+    toast('Nova mensagem de ' + msg.nome, 'info', 2500);
+});
 
 function showTyping() {
     const t = document.getElementById('typing-indicator');
