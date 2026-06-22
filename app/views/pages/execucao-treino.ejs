@@ -464,25 +464,8 @@ async function mostrarConclusao() {
         </button>
     `;
 
-    // Persiste finalização e verifica conquistas
-    if (sessaoId) {
-        try {
-            const r = await fetch('/treinos/sessao/finalizar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessao_id: sessaoId }),
-            });
-            const data = await r.json();
-            if (data.novasConquistas?.length) {
-                await sleep(600);
-                for (const c of data.novasConquistas) {
-                    await mostrarAnimacaoConquista(c);
-                    await sleep(400);
-                }
-            }
-        } catch {}
-    }
 }
+
 
 // ── Event listeners ───────────────────────────────────────
 document.getElementById('btnPrev').addEventListener('click', () => {
@@ -521,6 +504,27 @@ document.getElementById('btnFim').addEventListener('click', async () => {
                 carga_usada:      cargas[i] || null,
             });
         }
+    }
+    // Finaliza sessão e mostra conquistas ANTES da tela de conclusão
+    if (sessaoId) {
+        try {
+            const r = await fetch('/treinos/sessao/finalizar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessao_id: sessaoId }),
+            });
+            const data = await r.json();
+            if (data.novasConquistas && data.novasConquistas.length > 0) {
+                const tierOrder = { bronze: 1, prata: 2, ouro: 3, platina: 4, diamante: 5 };
+                const ordenadas = [...data.novasConquistas].sort(
+                    (a, b) => (tierOrder[a.tier] || 0) - (tierOrder[b.tier] || 0)
+                );
+                for (const c of ordenadas) {
+                    await mostrarAnimacaoConquista(c);
+                    await sleep(300);
+                }
+            }
+        } catch (e) { console.error('[conquista exibir]', e); }
     }
     mostrarConclusao();
 });
