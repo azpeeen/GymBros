@@ -6,13 +6,23 @@
 const express   = require('express');
 const router    = express.Router();
 const bcrypt         = require('bcryptjs');
+const { body, validationResult } = require('express-validator');
 const adminAuth      = require('../middleware/adminAuth');
+const { limiterLogin } = require('../middleware/rateLimits');
 const db             = require('../config/db');
 const User           = require('../models/User');
 const Plan           = require('../models/Plan');
 const Gym            = require('../models/Gym');
 const SupportTicket  = require('../models/SupportTicket');
 const Notification   = require('../models/Notification');
+const { sendBoasVindas, sendAlertaAdminNovaAcademia } = require('../services/emailGymAdmin');
+
+function gerarSenha(len = 10) {
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    let s = '';
+    for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+}
 
 // ── Helper: constrói adminConfig a partir de res.locals.config ───────────────
 function buildAdminConfig(config = {}) {
@@ -30,7 +40,14 @@ router.get('/login', (req, res) => {
     res.render('pages/admin-login', { erro: null, next: req.query.next || '/admin/dashboard' });
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', limiterLogin, [
+    body('email').isEmail().normalizeEmail().withMessage('E-mail inválido'),
+    body('password').isLength({ min: 6 }).withMessage('Senha muito curta'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.render('pages/admin-login', { erro: errors.array()[0].msg, next: req.body.next || '/admin/dashboard' });
+    }
     const { email, password } = req.body;
     try {
         const [rows] = await db.execute(
@@ -192,8 +209,201 @@ router.get('/usuarios/:id', async (req, res) => {
     }
 });
 
-// ── ACADEMIAS (descontinuado) ─────────────────────────────────────────────────
-router.get('/academias', (req, res) => res.redirect(302, '/admin/dashboard'));
+// ── ACADEMIAS ─────────────────────────────────────────────────────────────────
+router.get('/academias/check-cnpj', adminAuth, async (req, res) => {
+    const cnpj = (req.query.cnpj || '').replace(/\D/g, '');
+    if (cnpj.length !== 14) return res.json({ exists: false });
+    try {
+        const [[{ cnt }]] = await db.execute(
+            "SELECT COUNT(*) AS cnt FROM gym WHERE REPLACE(REPLACE(REPLACE(REPLACE(cnpj,'.','-'),'/',''),'-',''),' ','') = ?",
+            [cnpj]
+        );
+        res.json({ exists: cnt > 0 });
+    } catch { res.json({ exists: false }); }
+});
+
+router.get('/academias', adminAuth, async (req, res) => {
+    try {
+        const [academias] = await db.execute(`
+            SELECT g.id, g.nome, g.cnpj, g.cidade, g.estado, g.status,
+                   (SELECT COUNT(*) FROM user u WHERE u.gym_id = g.id) AS totalAlunos,
+                   (SELECT nome FROM gym_admin ga WHERE ga.gym_id = g.id AND ga.role='owner' LIMIT 1) AS responsavel,
+                   (SELECT plano FROM gym_contract gc WHERE gc.gym_id = g.id AND gc.ativo=1 LIMIT 1) AS plano
+            FROM gym g ORDER BY g.status ASC, g.nome ASC
+        `);
+        const [tc] = await db.execute("SELECT COUNT(*) AS cnt FROM support_ticket WHERE status != 'resolvido'");
+        const adminConfig = buildAdminConfig(res.locals.config);
+        res.render('pages/admin-academias', {
+            ticketCount: tc[0].cnt, adminConfig,
+            title: 'Academias', page: 'academias', admin: req.session.admin,
+            academias, sucesso: req.query.ok || null, erro: req.query.err || null,
+        });
+    } catch (err) {
+        console.error('[admin/academias]', err);
+        res.status(500).send('Erro ao listar academias.');
+    }
+});
+
+router.get('/academias/nova', adminAuth, async (req, res) => {
+    const [tc] = await db.execute("SELECT COUNT(*) AS cnt FROM support_ticket WHERE status != 'resolvido'");
+    const adminConfig = buildAdminConfig(res.locals.config);
+    res.render('pages/admin-academia-nova', {
+        ticketCount: tc[0].cnt, adminConfig,
+        title: 'Nova Academia', page: 'academias', admin: req.session.admin, erro: null,
+    });
+});
+
+router.post('/academias/nova', adminAuth, [
+    body('nome').trim().notEmpty().withMessage('Nome da academia é obrigatório').isLength({ max: 120 }),
+    body('cnpj').trim().notEmpty().withMessage('CNPJ é obrigatório'),
+    body('gestor_nome').trim().notEmpty().withMessage('Nome do gestor é obrigatório'),
+    body('gestor_email').isEmail().normalizeEmail().withMessage('E-mail do gestor inválido'),
+    body('valor_mensal').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Valor mensal inválido'),
+    body('max_alunos').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Máximo de alunos inválido'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const [tc] = await db.execute("SELECT COUNT(*) AS cnt FROM support_ticket WHERE status != 'resolvido'");
+        const adminConfig = buildAdminConfig(res.locals.config);
+        return res.render('pages/admin-academia-nova', {
+            ticketCount: tc[0].cnt, adminConfig,
+            title: 'Nova Academia', page: 'academias', admin: req.session.admin,
+            erro: errors.array()[0].msg,
+        });
+    }
+    const {
+        nome, cnpj, endereco, numero, bairro, cidade, estado, cep, telefone,
+        plano, valor_mensal, max_alunos, contato_responsavel, data_inicio,
+        gestor_nome, gestor_email,
+    } = req.body;
+    try {
+        const cnpjClean = cnpj.replace(/\D/g, '');
+        const cepClean  = cep  ? cep.replace(/\D/g, '')  : null;
+        const telClean  = telefone ? telefone.replace(/\D/g, '') : null;
+
+        const [gymRes] = await db.execute(
+            `INSERT INTO gym (nome, cnpj, endereco, numero, bairro, cidade, estado, cep, telefone, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ativa')`,
+            [nome.trim(), cnpjClean, endereco||null, numero||null, bairro||null,
+             cidade||null, estado||null, cepClean, telClean]
+        );
+        const gymId = gymRes.insertId;
+
+        await db.execute(
+            `INSERT INTO gym_contract (gym_id, plano, valor_mensal, max_alunos, ativo, data_inicio, contato_responsavel)
+             VALUES (?, ?, ?, ?, 1, ?, ?)`,
+            [gymId, plano||'basic', parseFloat(valor_mensal)||0,
+             parseInt(max_alunos)||100, data_inicio||new Date().toISOString().slice(0,10),
+             contato_responsavel||null]
+        );
+
+        const senhaTemporaria = gerarSenha();
+        const hash = await bcrypt.hash(senhaTemporaria, 10);
+        await db.execute(
+            `INSERT INTO gym_admin (gym_id, nome, email, senha_hash, role) VALUES (?, ?, ?, ?, 'owner')`,
+            [gymId, gestor_nome.trim(), gestor_email.trim().toLowerCase(), hash]
+        );
+
+        try {
+            await sendBoasVindas({
+                gestor: { nome: gestor_nome.trim(), email: gestor_email.trim() },
+                gym: { nome: nome.trim() },
+                senhaTemporaria,
+            });
+        } catch (emailErr) {
+            console.error('[admin/academias/nova] email error:', emailErr.message);
+        }
+
+        res.redirect('/admin/academias?ok=' + encodeURIComponent(`Academia "${nome.trim()}" criada. Email enviado para ${gestor_email.trim()}.`));
+    } catch (err) {
+        console.error('[admin/academias/nova]', err);
+        const [tc] = await db.execute("SELECT COUNT(*) AS cnt FROM support_ticket WHERE status != 'resolvido'");
+        const adminConfig = buildAdminConfig(res.locals.config);
+        res.render('pages/admin-academia-nova', {
+            ticketCount: tc[0].cnt, adminConfig,
+            title: 'Nova Academia', page: 'academias', admin: req.session.admin,
+            erro: err.code === 'ER_DUP_ENTRY' ? 'E-mail do gestor já existe no sistema.' : 'Erro ao criar academia.',
+        });
+    }
+});
+
+router.get('/academias/:id', adminAuth, async (req, res) => {
+    const gymId = parseInt(req.params.id);
+    try {
+        const gym = await Gym.findById(gymId);
+        if (!gym) return res.status(404).send('Academia não encontrada.');
+
+        const [contrato]  = await db.execute('SELECT * FROM gym_contract WHERE gym_id = ? ORDER BY ativo DESC, created_at DESC LIMIT 1', [gymId]);
+        const [gestores]  = await db.execute('SELECT id, nome, email, role, ativo, ultimo_login FROM gym_admin WHERE gym_id = ?', [gymId]);
+        const [alunos]    = await db.execute('SELECT id, nome, email, status FROM user WHERE gym_id = ? ORDER BY nome ASC LIMIT 50', [gymId]);
+        const [[{ totalAlunos }]] = await db.execute('SELECT COUNT(*) AS totalAlunos FROM user WHERE gym_id = ?', [gymId]);
+        const [[{ checkinsTotal }]] = await db.execute('SELECT COUNT(*) AS checkinsTotal FROM checkin WHERE gym_id = ?', [gymId]);
+
+        const [tc] = await db.execute("SELECT COUNT(*) AS cnt FROM support_ticket WHERE status != 'resolvido'");
+        const adminConfig = buildAdminConfig(res.locals.config);
+        res.render('pages/admin-academia-detalhe', {
+            ticketCount: tc[0].cnt, adminConfig,
+            title: gym.nome, page: 'academias', admin: req.session.admin,
+            gym, contrato: contrato[0]||null, gestores, alunos, totalAlunos, checkinsTotal,
+            sucesso: req.query.ok||null, erro: req.query.err||null,
+        });
+    } catch (err) {
+        console.error('[admin/academias/:id]', err);
+        res.status(500).send('Erro ao carregar academia.');
+    }
+});
+
+router.post('/academias/:id/aprovar', adminAuth, async (req, res) => {
+    const gymId = parseInt(req.params.id);
+    try {
+        const gym = await Gym.findById(gymId);
+        if (!gym) return res.redirect('/admin/academias?err=Academia+não+encontrada');
+
+        await db.execute("UPDATE gym SET status='ativa' WHERE id=?", [gymId]);
+        await db.execute('UPDATE gym_admin SET ativo=1 WHERE gym_id=?', [gymId]);
+
+        // Gera nova senha temporária e envia para cada gestor pendente
+        const [gestores] = await db.execute('SELECT nome, email FROM gym_admin WHERE gym_id=? AND role="owner" LIMIT 1', [gymId]);
+        if (gestores[0]) {
+            const senhaTemporaria = gerarSenha();
+            const hash = await bcrypt.hash(senhaTemporaria, 10);
+            await db.execute('UPDATE gym_admin SET senha_hash=? WHERE gym_id=? AND role="owner"', [hash, gymId]);
+            try {
+                await sendBoasVindas({ gestor: gestores[0], gym, senhaTemporaria });
+            } catch (e) { console.error('[admin/academias/aprovar] email:', e.message); }
+        }
+
+        res.redirect(`/admin/academias/${gymId}?ok=Academia+aprovada+com+sucesso`);
+    } catch (err) {
+        console.error('[admin/academias/aprovar]', err);
+        res.redirect(`/admin/academias/${gymId}?err=Erro+ao+aprovar`);
+    }
+});
+
+router.post('/academias/:id/gestor', adminAuth, async (req, res) => {
+    const gymId = parseInt(req.params.id);
+    const { gestor_nome, gestor_email, gestor_role } = req.body;
+    if (!gestor_nome?.trim() || !gestor_email?.trim()) {
+        return res.redirect(`/admin/academias/${gymId}?err=Nome+e+email+são+obrigatórios`);
+    }
+    try {
+        const senhaTemporaria = gerarSenha();
+        const hash = await bcrypt.hash(senhaTemporaria, 10);
+        await db.execute(
+            `INSERT INTO gym_admin (gym_id, nome, email, senha_hash, role) VALUES (?, ?, ?, ?, ?)`,
+            [gymId, gestor_nome.trim(), gestor_email.trim().toLowerCase(), hash, gestor_role||'manager']
+        );
+        const gym = await Gym.findById(gymId);
+        try {
+            await sendBoasVindas({ gestor: { nome: gestor_nome.trim(), email: gestor_email.trim() }, gym, senhaTemporaria });
+        } catch (e) { console.error('[admin/academias/gestor] email:', e.message); }
+        res.redirect(`/admin/academias/${gymId}?ok=Gestor+adicionado`);
+    } catch (err) {
+        console.error('[admin/academias/gestor]', err);
+        const msg = err.code === 'ER_DUP_ENTRY' ? 'Email+já+cadastrado' : 'Erro+ao+adicionar+gestor';
+        res.redirect(`/admin/academias/${gymId}?err=${msg}`);
+    }
+});
 
 // ── PLANOS ───────────────────────────────────────────────────────────────────
 router.get('/planos', async (req, res) => {
