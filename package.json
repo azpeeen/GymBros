@@ -7,6 +7,7 @@
     "convert-images": "node scripts/convert-webp.js",
     "seed-admin": "node scripts/seed-admin.js",
     "migrate": "node scripts/migrate-user-columns.js",
+    "migrate-senha-hash": "node scripts/migrate-senha-hash.js",
     "seed-checkins": "node scripts/seed-checkins.js",
     "start": "node app.js"
   },
@@ -16,6 +17,7 @@
     "@google/genai": "^1.48.0",
     "@simplewebauthn/server": "^13.3.0",
     "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "bwip-js": "^4.9.0",
     "cloudinary": "^1.41.3",
     "cookie-parser": "^1.4.7",
