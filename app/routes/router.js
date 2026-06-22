@@ -24,6 +24,7 @@ const { broadcast, onlineUsers, addTicketClient, broadcastTicket } = require('..
 const cloudinary = require('../config/cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const requirePlanLevel = require('../middleware/requirePlanLevel');
+const { limiterLogin } = require('../middleware/rateLimits');
 
 function safeJson(str, fallback) {
     try { return JSON.parse(str || 'null') ?? fallback; }
@@ -2204,8 +2205,16 @@ router.get('/api/suporte/tickets/:id/stream', requireAuth, async (req, res) => {
     addTicketClient(ticketId, res);
 });
 
+// Verifica sessão de admin GymBros para rotas administrativas
+function requireAdminUser(req, res, next) {
+    if (!req.session.admin) {
+        return res.redirect('/admin/login?next=' + encodeURIComponent(req.originalUrl));
+    }
+    next();
+}
+
 // Admin — Suporte
-router.get('/admin/suporte', requireAuth, async (req, res) => {
+router.get('/admin/suporte', requireAdminUser, async (req, res) => {
     const { status } = req.query;
     try {
         const where = status ? 'WHERE t.status = ?' : '';
@@ -2248,7 +2257,7 @@ router.get('/admin/suporte', requireAuth, async (req, res) => {
     }
 });
 
-router.get('/admin/suporte/:id', requireAuth, async (req, res) => {
+router.get('/admin/suporte/:id', requireAdminUser, async (req, res) => {
     try {
         const [[ticket]] = await db.execute(
             `SELECT t.*, u.nome AS userName, u.email AS userEmail
@@ -2286,7 +2295,7 @@ router.get('/admin/suporte/:id', requireAuth, async (req, res) => {
     }
 });
 
-router.post('/api/admin/suporte/tickets/:id/mensagem', requireAuth, async (req, res) => {
+router.post('/api/admin/suporte/tickets/:id/mensagem', requireAdminUser, async (req, res) => {
     const { texto } = req.body;
     if (!texto?.trim()) return res.status(400).json({ erro: 'Texto obrigatório.' });
     try {
@@ -2320,7 +2329,7 @@ router.post('/api/admin/suporte/tickets/:id/mensagem', requireAuth, async (req, 
     }
 });
 
-router.get('/api/admin/suporte/tickets/:id/stream', requireAuth, (req, res) => {
+router.get('/api/admin/suporte/tickets/:id/stream', requireAdminUser, (req, res) => {
     res.set({
         'Content-Type':      'text/event-stream',
         'Cache-Control':     'no-cache',
@@ -2334,7 +2343,7 @@ router.get('/api/admin/suporte/tickets/:id/stream', requireAuth, (req, res) => {
     req.on('close', () => clearInterval(ping));
 });
 
-router.put('/api/admin/suporte/tickets/:id/status', requireAuth, async (req, res) => {
+router.put('/api/admin/suporte/tickets/:id/status', requireAdminUser, async (req, res) => {
     const { status } = req.body;
     const validos = ['aberto', 'em_atendimento', 'resolvido', 'fechado'];
     if (!validos.includes(status)) return res.status(400).json({ erro: 'Status inválido.' });
@@ -2508,6 +2517,7 @@ router.post('/register',
 
 // Login
 router.post('/login',
+  limiterLogin,
   [
     body('username').trim().notEmpty().withMessage('Usuário obrigatório.'),
     body('password').notEmpty().withMessage('Senha obrigatória.'),
@@ -3335,6 +3345,62 @@ router.get('/lang/:locale', (req, res) => {
     }
     const back = req.headers.referer || '/';
     res.redirect(back);
+});
+
+// ── CADASTRO DE ACADEMIA (self-service público) ───────────────────────────────
+const { sendAguardandoAprovacao, sendAlertaAdminNovaAcademia } = require('../services/emailGymAdmin');
+
+router.get('/academias/cadastro', (req, res) => {
+    res.render('pages/academia-cadastro', { erro: null });
+});
+
+router.post('/academias/cadastro', [
+    body('gym_nome').trim().notEmpty().withMessage('Nome da academia é obrigatório'),
+    body('cnpj').trim().notEmpty().withMessage('CNPJ é obrigatório'),
+    body('gestor_nome').trim().notEmpty().withMessage('Nome do responsável é obrigatório'),
+    body('gestor_email').isEmail().normalizeEmail().withMessage('E-mail inválido'),
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.render('pages/academia-cadastro', { erro: errors.array()[0].msg });
+    }
+    const {
+        gym_nome, cnpj, cidade, estado, endereco,
+        gestor_nome, gestor_email,
+    } = req.body;
+    try {
+        const [gymRes] = await db.execute(
+            `INSERT INTO gym (nome, cnpj, endereco, cidade, estado, status) VALUES (?, ?, ?, ?, ?, 'pendente')`,
+            [gym_nome.trim(), cnpj.trim(), endereco||null, cidade||null, estado||null]
+        );
+        const gymId = gymRes.insertId;
+
+        // Gestor inativo (ativo=0) até aprovação
+        const { hash } = await (async () => {
+            const bcrypt = require('bcryptjs');
+            const h = await bcrypt.hash(Math.random().toString(36), 10);
+            return { hash: h };
+        })();
+        const [gaRes] = await db.execute(
+            `INSERT INTO gym_admin (gym_id, nome, email, senha_hash, role, ativo) VALUES (?, ?, ?, ?, 'owner', 0)`,
+            [gymId, gestor_nome.trim(), gestor_email.trim().toLowerCase(), hash]
+        );
+
+        const gym    = { nome: gym_nome.trim(), cidade, estado };
+        const gestor = { nome: gestor_nome.trim(), email: gestor_email.trim() };
+
+        // Emails em paralelo, sem bloquear o redirect em caso de falha
+        Promise.all([
+            sendAguardandoAprovacao({ gestor, gym }),
+            sendAlertaAdminNovaAcademia({ gym, gestor, adminAcademiaId: gymId }),
+        ]).catch(e => console.error('[cadastro-academia] email error:', e.message));
+
+        res.render('pages/academia-confirmacao', { gym_nome: gym_nome.trim(), gestor_email: gestor.email });
+    } catch (err) {
+        console.error('[cadastro-academia]', err);
+        const msg = err.code === 'ER_DUP_ENTRY' ? 'Este e-mail de gestor já está cadastrado no sistema.' : 'Erro ao registrar academia. Tente novamente.';
+        res.render('pages/academia-cadastro', { erro: msg });
+    }
 });
 
 module.exports = router;

@@ -5,8 +5,11 @@ const MySQLStore = require('express-mysql-session')(session);
 const path       = require('path');
 const fs         = require('fs');
 const cookieParser = require('cookie-parser');
+const helmet       = require('helmet');
+const cors         = require('cors');
 const db           = require('./app/config/db');
 const i18n         = require('./app/config/i18n');
+const { limiterGeral } = require('./app/middleware/rateLimits');
 
 const app  = express();
 const port = 3000;
@@ -14,6 +17,85 @@ const port = 3000;
 // Garante que o diretório de uploads existe
 const uploadDir = path.join(__dirname, 'uploads', 'profile_photos');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+// ===========================
+// SEGURANÇA — HEADERS
+// ===========================
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: [
+                "'self'",
+                "'unsafe-inline'",
+                "https://cdnjs.cloudflare.com",
+                "https://fonts.googleapis.com",
+                "https://js.hcaptcha.com",
+                "https://challenges.cloudflare.com",
+            ],
+            styleSrc: [
+                "'self'",
+                "'unsafe-inline'",
+                "https://cdnjs.cloudflare.com",
+                "https://fonts.googleapis.com",
+                "https://fonts.gstatic.com",
+            ],
+            imgSrc: [
+                "'self'",
+                "data:",
+                "https://res.cloudinary.com",
+                "https://viacep.com.br",
+            ],
+            fontSrc: [
+                "'self'",
+                "https://fonts.gstatic.com",
+                "https://cdnjs.cloudflare.com",
+            ],
+            connectSrc: [
+                "'self'",
+                "https://viacep.com.br",
+                "https://api.workoutxapp.com",
+            ],
+            frameSrc: [
+                "https://challenges.cloudflare.com",
+                "https://js.hcaptcha.com",
+            ],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+        },
+    },
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+    },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
+
+// ===========================
+// CORS
+// ===========================
+const allowedOrigins = [
+    'http://localhost:3000',
+    'https://gymbros.app.br',
+    'https://www.gymbros.app.br',
+];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error('CORS: origem não permitida'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// ===========================
+// RATE LIMIT GERAL
+// ===========================
+app.use(limiterGeral);
 
 // ===========================
 // MIDDLEWARES
@@ -47,7 +129,7 @@ app.use(session({
         maxAge:   1000 * 60 * 60 * 24 * 30, // 30 dias
         httpOnly: true,
         secure:   process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: 'strict',
     },
 }));
 
@@ -107,6 +189,9 @@ app.use('/api/suporte', rotasSuporte);
 const rotasPush = require('./app/routes/push');
 app.use('/push', rotasPush);
 app.use('/internal/push', rotasPush);
+
+const rotasGymAdmin = require('./app/routes/gymAdmin');
+app.use('/gym-admin', rotasGymAdmin);
 
 app.listen(port, () => {
   console.log(`Servidor ouvindo na porta ${port}\nhttp://localhost:${port}`);

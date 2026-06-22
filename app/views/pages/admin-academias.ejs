@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,36 +19,52 @@
             <section class="flex-between mb-16">
                 <section>
                     <h1 class="admin-page-title">Academias</h1>
-                    <p class="admin-page-subtitle"><%= academias.length %> academias cadastradas</p>
+                    <p class="admin-page-subtitle"><%= academias.length %> academia<%= academias.length!==1?'s':'' %> cadastrada<%= academias.length!==1?'s':'' %></p>
                 </section>
-                <button class="btn btn-gold" data-modal-open="modal-academia">
-                    <i class="fas fa-plus"></i> Nova Academia
-                </button>
+                <a href="/admin/academias/nova" class="btn btn-gold"><i class="fas fa-plus"></i> Nova Academia</a>
             </section>
+
+            <% if (sucesso) { %>
+            <section class="admin-toast" style="position:static;margin-bottom:16px;border-left-color:var(--success)">
+                <i class="fas fa-check-circle" style="color:var(--success)"></i> <%= sucesso %>
+            </section>
+            <% } %>
+            <% if (erro) { %>
+            <section class="admin-toast" style="position:static;margin-bottom:16px;border-left-color:var(--error)">
+                <i class="fas fa-exclamation-circle" style="color:var(--error)"></i> <%= erro %>
+            </section>
+            <% } %>
 
             <section class="admin-card">
                 <section class="admin-card-body no-pad">
                     <section class="admin-table-wrap">
                         <table class="admin-table">
                             <thead>
-                                <tr><th>Nome</th><th>CNPJ</th><th>Cidade</th><th>Responsável</th><th>Alunos</th><th>Status</th><th>Ações</th></tr>
+                                <tr><th>Nome</th><th>CNPJ</th><th>Cidade</th><th>Responsável</th><th>Plano</th><th>Alunos</th><th>Status</th><th></th></tr>
                             </thead>
                             <tbody>
+                            <% if (academias.length === 0) { %>
+                            <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhuma academia cadastrada ainda.</td></tr>
+                            <% } %>
                             <% academias.forEach(a => { %>
                             <tr>
                                 <td class="fw-600"><%= a.nome %></td>
-                                <td class="text-muted"><%= a.cnpj %></td>
-                                <td class="text-muted"><%= a.cidade %></td>
-                                <td class="text-muted"><%= a.responsavel %></td>
-                                <td><span class="badge badge-muted"><%= a.totalAlunos %></span></td>
-                                <td><span class="badge <%= a.status==='ativa'?'badge-success':'badge-muted' %>"><%= a.status %></span></td>
+                                <td class="text-muted"><%= a.cnpj || '—' %></td>
+                                <td class="text-muted"><%= [a.cidade, a.estado].filter(Boolean).join('/') || '—' %></td>
+                                <td class="text-muted"><%= a.responsavel || '—' %></td>
                                 <td>
-                                    <section class="flex gap-10">
-                                        <button class="btn btn-danger btn-sm btn-icon" data-toggle-academia="<%= a.id %>" title="<%= a.status==='ativa'?'Desativar':'Ativar' %>">
-                                            <i class="fas <%= a.status==='ativa'?'fa-ban':'fa-check' %>"></i>
-                                        </button>
-                                    </section>
+                                    <% if (a.plano) { %>
+                                    <span class="badge badge-gold" style="text-transform:capitalize"><%= a.plano %></span>
+                                    <% } else { %><span class="text-muted">—</span><% } %>
                                 </td>
+                                <td><span class="badge badge-muted"><%= a.totalAlunos %></span></td>
+                                <td>
+                                    <span class="badge <%=
+                                        a.status==='ativa' ? 'badge-success' :
+                                        a.status==='pendente' ? 'badge-warning' : 'badge-muted'
+                                    %>"><%= a.status %></span>
+                                </td>
+                                <td><a href="/admin/academias/<%= a.id %>" class="btn btn-outline btn-sm">Ver</a></td>
                             </tr>
                             <% }) %>
                             </tbody>
@@ -59,57 +75,6 @@
         </main>
     </section>
 </section>
-
-<!-- Modal Nova Academia -->
-<section class="admin-modal-backdrop" id="modal-academia">
-    <section class="admin-modal">
-        <section class="admin-modal-header">
-            <span class="admin-modal-title"><i class="fas fa-dumbbell text-gold"></i> Nova Academia</span>
-            <button class="admin-modal-close" data-modal-close="modal-academia"><i class="fas fa-times"></i></button>
-        </section>
-        <form id="form-academia">
-            <section class="admin-2col">
-                <section class="admin-form-group">
-                    <label>Nome *</label>
-                    <input type="text" name="nome" class="admin-input" required placeholder="Smart Fit Centro">
-                </section>
-                <section class="admin-form-group">
-                    <label>CNPJ *</label>
-                    <input type="text" name="cnpj" class="admin-input" required placeholder="00.000.000/0001-00">
-                </section>
-            </section>
-            <section class="admin-form-group">
-                <label>Endereço</label>
-                <input type="text" name="endereco" class="admin-input" placeholder="Rua das Flores, 123">
-            </section>
-            <section class="admin-2col">
-                <section class="admin-form-group">
-                    <label>Cidade</label>
-                    <input type="text" name="cidade" class="admin-input" placeholder="São Paulo">
-                </section>
-                <section class="admin-form-group">
-                    <label>CEP</label>
-                    <input type="text" name="cep" class="admin-input" placeholder="00000-000">
-                </section>
-            </section>
-            <section class="admin-2col">
-                <section class="admin-form-group">
-                    <label>Responsável</label>
-                    <input type="text" name="responsavel" class="admin-input" placeholder="Nome do responsável">
-                </section>
-                <section class="admin-form-group">
-                    <label>Telefone</label>
-                    <input type="text" name="telefone" class="admin-input" placeholder="(11) 0000-0000">
-                </section>
-            </section>
-            <section class="admin-modal-footer">
-                <button type="button" class="btn btn-outline" data-modal-close="modal-academia">Cancelar</button>
-                <button type="submit" class="btn btn-gold"><i class="fas fa-save"></i> Salvar Academia</button>
-            </section>
-        </form>
-    </section>
-</section>
-
 <script src="/js/admin.js"></script>
 </body>
 </html>
