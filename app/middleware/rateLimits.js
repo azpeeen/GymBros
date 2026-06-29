@@ -1,12 +1,21 @@
 'use strict';
 const rateLimit = require('express-rate-limit');
 
+const skipLocalhost = (req) => {
+    const ip = req.ip || req.connection?.remoteAddress || '';
+    return ip === '127.0.0.1'
+        || ip === '::1'
+        || ip === '::ffff:127.0.0.1'
+        || process.env.NODE_ENV === 'development';
+};
+
 const limiterGeral = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
     standardHeaders: true,
     legacyHeaders: false,
     message: { erro: 'Muitas requisições. Tente novamente em 15 minutos.' },
+    skip: skipLocalhost,
 });
 
 const limiterLogin = rateLimit({
@@ -16,6 +25,7 @@ const limiterLogin = rateLimit({
     legacyHeaders: false,
     skipSuccessfulRequests: true,
     message: { erro: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+    skip: skipLocalhost,
 });
 
 const limiterUpload = rateLimit({
@@ -24,6 +34,7 @@ const limiterUpload = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { erro: 'Limite de uploads atingido. Tente novamente em 1 hora.' },
+    skip: skipLocalhost,
 });
 
 module.exports = { limiterGeral, limiterLogin, limiterUpload };

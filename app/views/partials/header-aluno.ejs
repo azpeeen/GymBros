@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <header class="gymbros-header">
         <section class="header-container">
             <section class="menu-icon" id="menuToggle" aria-label="Abrir menu" aria-expanded="false">
@@ -5,7 +6,7 @@
             </section>
 
             <section class="logo">
-                <a href="/area-aluno" aria-label="GymBros — Início">
+                <a href="/" aria-label="GymBros — Feed">
                     <img src="/images/logo.png" alt="Logo GymBros" width="32" height="32" loading="eager">
                     <span>GymBros</span>
                 </a>
@@ -18,13 +19,33 @@
                     <button class="lang-btn" data-lang="es" title="Español (ES)"   aria-label="Cambiar a Español">🇪🇸</button>
                 </nav>
 
+                <a href="/buscar" class="topbar-icon" title="Buscar pessoas" aria-label="Buscar pessoas">
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                </a>
+
+                <section class="topbar-notif-wrap" style="position:relative">
+                    <button class="topbar-notif-btn" id="notifToggle" title="Notificações" aria-label="Notificações" type="button">
+                        <i class="fas fa-bell" aria-hidden="true"></i>
+                        <span class="notif-badge" id="topbarNotifBadge" style="display:none">0</span>
+                    </button>
+                    <section class="notif-dropdown" id="notifDropdown" style="display:none">
+                        <section class="notif-dropdown-header">
+                            <span>Notificações</span>
+                            <button class="notif-ler-todas" id="notifLerTodas" type="button">Marcar todas como lidas</button>
+                        </section>
+                        <section class="notif-dropdown-lista" id="notifLista">
+                            <section class="notif-loading"><i class="fas fa-spinner fa-spin"></i></section>
+                        </section>
+                    </section>
+                </section>
+
+                <a href="/u/<%= locals.user && user.username %>" class="topbar-avatar" aria-label="Meu perfil">
+                    <img src="<%= locals.user && user.profile_photo || '/images/avatar.png' %>" alt="Avatar" width="32" height="32">
+                </a>
+
                 <button id="themeToggle" class="theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema">
                     <i class="fas fa-moon" id="themeIcon" aria-hidden="true"></i>
                 </button>
-
-                <a href="/area-aluno" class="user-icon" aria-label="Minha área">
-                    <i class="fas fa-user" aria-hidden="true"></i>
-                </a>
             </section>
         </section>
     </header>
@@ -149,6 +170,121 @@
 </script>
 <script src="/js/landscape-report.js" defer></script>
 <script src="/js/conquistas.js"></script>
+<% if (locals.user) { %>
+<script>
+(function () {
+    const badge      = document.getElementById('topbarNotifBadge');
+    const toggle     = document.getElementById('notifToggle');
+    const dropdown   = document.getElementById('notifDropdown');
+    const lista      = document.getElementById('notifLista');
+    const lerTodas   = document.getElementById('notifLerTodas');
+    if (!toggle || !dropdown) return;
+
+    function escHtml(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function formatarTempo(iso) {
+        const d = new Date(iso);
+        const diff = (Date.now() - d) / 1000;
+        if (diff < 60) return 'agora';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h';
+        return Math.floor(diff / 86400) + 'd';
+    }
+
+    function atualizarBadge(total) {
+        if (total > 0) {
+            badge.textContent = total > 99 ? '99+' : total;
+            badge.style.display = 'inline-flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    async function carregarCount() {
+        try {
+            const d = await fetch('/api/notificacoes/sociais/count').then(r => r.json());
+            atualizarBadge(d.total || 0);
+        } catch (_) {}
+    }
+
+    async function carregarNotificacoes() {
+        lista.innerHTML = '<section class="notif-loading"><i class="fas fa-spinner fa-spin"></i></section>';
+        try {
+            const d = await fetch('/api/notificacoes/sociais').then(r => r.json());
+            if (!d.notificacoes?.length) {
+                lista.innerHTML = '<section class="notif-vazio">Nenhuma notificação</section>';
+                return;
+            }
+            lista.innerHTML = d.notificacoes.map(n => `
+                <section class="notif-item${n.lida ? '' : ' notif-item--nova'}" data-id="${n.id}">
+                    <section class="notif-item-icon notif-icon--${escHtml(n.tipo)}">
+                        <i class="fas ${n.tipo === 'solicitacao_amizade' ? 'fa-user-plus' : n.tipo === 'amizade_aceita' ? 'fa-user-check' : 'fa-bell'}"></i>
+                    </section>
+                    <section class="notif-item-body">
+                        <section class="notif-item-titulo">${escHtml(n.titulo)}</section>
+                        ${n.mensagem ? `<section class="notif-item-msg">${escHtml(n.mensagem)}</section>` : ''}
+                        <section class="notif-item-tempo">${formatarTempo(n.criado_em)}</section>
+                    </section>
+                    ${!n.lida ? '<span class="notif-dot"></span>' : ''}
+                </section>
+            `).join('');
+        } catch (_) {
+            lista.innerHTML = '<section class="notif-vazio">Erro ao carregar</section>';
+        }
+    }
+
+    toggle.addEventListener('click', e => {
+        e.stopPropagation();
+        const aberto = dropdown.style.display !== 'none';
+        dropdown.style.display = aberto ? 'none' : 'block';
+        if (!aberto) carregarNotificacoes();
+    });
+
+    document.addEventListener('click', e => {
+        if (!dropdown.contains(e.target) && e.target !== toggle) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    lista.addEventListener('click', async e => {
+        const item = e.target.closest('.notif-item--nova');
+        if (!item) return;
+        const id = item.dataset.id;
+        item.classList.remove('notif-item--nova');
+        item.querySelector('.notif-dot')?.remove();
+        await fetch(`/api/notificacoes/sociais/ler/${id}`, { method: 'POST' }).catch(() => {});
+        carregarCount();
+    });
+
+    lerTodas.addEventListener('click', async () => {
+        await fetch('/api/notificacoes/sociais/ler-todas', { method: 'POST' }).catch(() => {});
+        lista.querySelectorAll('.notif-item--nova').forEach(el => {
+            el.classList.remove('notif-item--nova');
+            el.querySelector('.notif-dot')?.remove();
+        });
+        atualizarBadge(0);
+    });
+
+    // SSE para notificações em tempo real
+    const sseSocial = new EventSource('/api/notificacoes/sociais/stream');
+    sseSocial.addEventListener('message', e => {
+        try {
+            const d = JSON.parse(e.data);
+            if (d.event === 'notificacao_social') {
+                const atual = parseInt(badge.textContent || '0', 10);
+                atualizarBadge(isNaN(atual) ? 1 : atual + 1);
+                if (dropdown.style.display !== 'none') carregarNotificacoes();
+            }
+        } catch (_) {}
+    });
+    window.addEventListener('beforeunload', () => sseSocial.close(), { once: true });
+
+    carregarCount();
+})();
+</script>
+<% } %>
 <%- include('./logout-modal') %>
 <% if (locals.user && user.status === 'pendente_exclusao') { %>
 <section class="banner-exclusao-pendente">
