@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<%- include('../partials/seo') %>
+<link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/footer.css">
+<link rel="stylesheet" href="/css/area-aluno.css">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+</head>
+<body>
+
+<%- include('../partials/header-aluno') %>
+
+<section class="aluno-dashboard">
+    <section class="sidebar-overlay" id="sidebarOverlay"></section>
+    <%- include('../partials/sidebar-aluno') %>
+
+    <section class="aluno-main">
+        <section class="amizades-layout">
+
+            <section class="amizades-header">
+                <h1 class="amizades-titulo"><i class="fas fa-user-friends"></i> Amigos</h1>
+                <a href="/buscar" class="amizades-buscar-btn">
+                    <i class="fas fa-search"></i> Encontrar pessoas
+                </a>
+            </section>
+
+            <% if (solicitacoes.length > 0) { %>
+            <section class="amizades-section">
+                <h2 class="amizades-section-title">
+                    Solicitações recebidas
+                    <span class="amizades-count-badge"><%= solicitacoes.length %></span>
+                </h2>
+                <section class="amizades-grid" id="solicitacoes-grid">
+                    <% solicitacoes.forEach(s => { %>
+                    <section class="amigo-card" id="sol-<%= s.friendship_id %>">
+                        <img src="<%= s.foto_perfil || '/images/avatar.png' %>" class="amigo-avatar" alt="<%= s.nome %>">
+                        <section class="amigo-info">
+                            <section class="amigo-nome"><%= s.nome %></section>
+                            <section class="amigo-username">@<%= s.username %></section>
+                        </section>
+                        <section class="amizades-acoes">
+                            <button class="amizades-btn amizades-btn--aceitar" data-fid="<%= s.friendship_id %>">
+                                <i class="fas fa-check"></i> Aceitar
+                            </button>
+                            <button class="amizades-btn amizades-btn--recusar" data-fid="<%= s.friendship_id %>">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </section>
+                    </section>
+                    <% }) %>
+                </section>
+            </section>
+            <% } %>
+
+            <section class="amizades-section">
+                <h2 class="amizades-section-title">
+                    Amigos
+                    <span class="amizades-count-badge"><%= amigos.length %></span>
+                </h2>
+                <% if (amigos.length === 0) { %>
+                <section class="amizades-vazio">
+                    <i class="fas fa-user-friends" style="font-size:2.5rem;opacity:.15;display:block;margin-bottom:14px"></i>
+                    Você ainda não tem amigos por aqui.<br>
+                    <a href="/buscar" style="color:#C98B1D;text-decoration:none">Buscar pessoas →</a>
+                </section>
+                <% } else { %>
+                <section class="amizades-grid">
+                    <% amigos.forEach(a => { %>
+                    <section class="amigo-card">
+                        <img src="<%= a.foto_perfil || '/images/avatar.png' %>" class="amigo-avatar" alt="<%= a.nome %>">
+                        <section class="amigo-info">
+                            <section class="amigo-nome"><%= a.nome %></section>
+                            <section class="amigo-username">@<%= a.username %></section>
+                        </section>
+                        <a href="/u/<%= a.username %>" class="btn-ver-perfil">
+                            <i class="fas fa-user"></i> Ver perfil
+                        </a>
+                        <button class="amizades-btn amizades-btn--remover" data-uid="<%= a.id %>">
+                            <i class="fas fa-user-minus"></i>
+                        </button>
+                    </section>
+                    <% }) %>
+                </section>
+                <% } %>
+            </section>
+
+        </section>
+    </section>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    document.addEventListener('click', async e => {
+        const aceitar = e.target.closest('.amizades-btn--aceitar');
+        if (aceitar) {
+            aceitar.disabled = true;
+            aceitar.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            const fid = aceitar.dataset.fid;
+            const r = await fetch(`/api/amizades/${fid}/aceitar`, { method: 'POST' }).then(x => x.json()).catch(() => ({ ok: false }));
+            if (r.ok) {
+                document.getElementById('sol-' + fid)?.remove();
+            } else {
+                aceitar.disabled = false;
+                aceitar.innerHTML = '<i class="fas fa-check"></i> Aceitar';
+            }
+            return;
+        }
+
+        const recusar = e.target.closest('.amizades-btn--recusar');
+        if (recusar) {
+            recusar.disabled = true;
+            const fid = recusar.dataset.fid;
+            const r = await fetch(`/api/amizades/${fid}/recusar`, { method: 'POST' }).then(x => x.json()).catch(() => ({ ok: false }));
+            if (r.ok) {
+                document.getElementById('sol-' + fid)?.remove();
+            } else {
+                recusar.disabled = false;
+            }
+            return;
+        }
+
+        const remover = e.target.closest('.amizades-btn--remover');
+        if (remover) {
+            if (!confirm('Remover amigo?')) return;
+            remover.disabled = true;
+            const uid = remover.dataset.uid;
+            const r = await fetch(`/api/amizades/${uid}`, { method: 'DELETE' }).then(x => x.json()).catch(() => ({ ok: false }));
+            if (r.ok) {
+                remover.closest('.amizades-card')?.remove();
+            } else {
+                remover.disabled = false;
+            }
+        }
+    });
+
+});
+</script>
+
+</body>
+</html>

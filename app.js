@@ -32,6 +32,8 @@ app.use(helmet({
                 "https://fonts.googleapis.com",
                 "https://js.hcaptcha.com",
                 "https://challenges.cloudflare.com",
+                "https://unpkg.com",
+                "https://code.jquery.com",
             ],
             styleSrc: [
                 "'self'",
@@ -39,22 +41,27 @@ app.use(helmet({
                 "https://cdnjs.cloudflare.com",
                 "https://fonts.googleapis.com",
                 "https://fonts.gstatic.com",
+                "https://unpkg.com",
             ],
             imgSrc: [
                 "'self'",
                 "data:",
                 "https://res.cloudinary.com",
                 "https://viacep.com.br",
+                "https://*.tile.openstreetmap.org",
             ],
             fontSrc: [
                 "'self'",
                 "https://fonts.gstatic.com",
                 "https://cdnjs.cloudflare.com",
+                "https://unpkg.com",
             ],
             connectSrc: [
                 "'self'",
                 "https://viacep.com.br",
                 "https://api.workoutxapp.com",
+                "https://overpass-api.de",
+                "https://nominatim.openstreetmap.org",
             ],
             frameSrc: [
                 "https://challenges.cloudflare.com",

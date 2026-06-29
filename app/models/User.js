@@ -1,5 +1,6 @@
 'use strict';
-const db = require('../config/db');
+const db     = require('../config/db');
+const crypto = require('crypto');
 
 class User {
     static async findById(id) {
@@ -66,11 +67,12 @@ class User {
     }
 
     static async create({ nome, cpf, email, senha_hash, cep, logradouro, numero, complemento, bairro, cidade, estado }) {
+        const qr_token = crypto.randomBytes(32).toString('hex');
         const [result] = await db.execute(
-            `INSERT INTO user (nome, cpf, email, senha_hash, cep, logradouro, numero, complemento, bairro, cidade, estado)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO user (nome, cpf, email, senha_hash, cep, logradouro, numero, complemento, bairro, cidade, estado, qr_token)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [nome, cpf, email, senha_hash, cep || null, logradouro || null, numero || null,
-             complemento || null, bairro || null, cidade || null, estado || null]
+             complemento || null, bairro || null, cidade || null, estado || null, qr_token]
         );
         return result.insertId;
     }

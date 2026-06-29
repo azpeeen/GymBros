@@ -21,7 +21,7 @@
         <h3 class="logout-modal-title">Sair da conta?</h3>
         <p class="logout-modal-desc">Você precisará fazer login novamente para acessar sua conta.</p>
         <section class="logout-modal-btns">
-            <button class="logout-btn-cancel" onclick="fecharModalLogout()">Cancelar</button>
+            <button class="logout-btn-cancel" id="logoutBtnCancelar">Cancelar</button>
             <form action="/logout" method="POST" style="margin:0">
                 <button type="submit" class="logout-btn-confirm">Sair da conta</button>
             </form>
@@ -40,7 +40,11 @@ function fecharModalLogout() {
 document.getElementById('logoutModal').addEventListener('click', function(e) {
     if (e.target === this) fecharModalLogout();
 });
+document.getElementById('logoutBtnCancelar').addEventListener('click', fecharModalLogout);
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') fecharModalLogout();
+});
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.sidebar-logout-btn')) abrirModalLogout();
 });
 </script>

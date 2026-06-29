@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<%- include('../partials/seo') %>
+<link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/footer.css">
+<link rel="stylesheet" href="/css/area-aluno.css">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+</head>
+<body>
+
+<%- include('../partials/header-aluno') %>
+
+<section class="aluno-dashboard">
+    <section class="sidebar-overlay" id="sidebarOverlay"></section>
+
+    <!-- SIDEBAR -->
+    <section class="aluno-sidebar">
+        <section class="aluno-profile">
+            <section class="avatar">
+                <img src="<%= user.profile_photo || '/images/avatar.png' %>" alt="Avatar do Aluno">
+            </section>
+            <h2><%= user.nome %></h2>
+            <p data-translate="sidebar.role">Aluno GymBros</p>
+        </section>
+        <ul class="aluno-menu">
+            <li class="menu-section-label">Principal</li>
+            <li><a href="/feed" class="active"><i class="fas fa-home"></i> Feed</a></li>
+            <li><a href="/metricas"><i class="fas fa-tachometer-alt"></i> Minhas Métricas</a></li>
+
+            <li class="menu-section-label">Social</li>
+            <li><a href="/amizades"><i class="fas fa-user-friends"></i> Amigos</a></li>
+            <li><a href="/buscar"><i class="fas fa-search"></i> Buscar pessoas</a></li>
+
+            <li class="menu-section-label">Treino</li>
+            <li><a href="/treinos" data-translate="sidebar.treinos"><i class="fas fa-dumbbell"></i> Meus Treinos</a></li>
+            <li><a href="/evolucao" data-translate="sidebar.evolucao"><i class="fas fa-chart-line"></i> Evolução</a></li>
+
+            <li class="menu-section-label">Saúde</li>
+            <li><a href="/nutricao" data-translate="sidebar.nutricao"><i class="fas fa-utensils"></i> Nutrição</a></li>
+            <li><a href="/imc-form"><i class="fas fa-clipboard-list"></i> Medidas</a></li>
+
+            <li class="menu-section-label">IA</li>
+            <% if (user && (user.planoSlug === 'gymbro' || user.planoSlug === 'black')) { %>
+            <li><a href="/ai/chat" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA</a></li>
+            <% } else { %>
+            <li><a href="/meu-plano?upgrade=1" class="menu-locked" data-translate="sidebar.ai"><i class="fas fa-robot"></i> Personal Trainer IA 🔒</a></li>
+            <% } %>
+            <% if (user && user.planoSlug === 'black') { %>
+            <li><a href="/ai/avaliacao" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal</a></li>
+            <% } else { %>
+            <li><a href="/meu-plano?upgrade=1" class="menu-locked" data-translate="sidebar.avaliacao"><i class="fas fa-camera"></i> Avaliação Corporal 🔒</a></li>
+            <% } %>
+
+            <li class="menu-section-label">Academia</li>
+            <li class="sidebar-scan-item"><a href="/scan"><i class="fas fa-qrcode"></i> Check-in / Scan</a></li>
+            <li><a href="/suporte" data-translate="sidebar.suporte"><i class="fas fa-headset"></i> Suporte</a></li>
+
+            <li class="menu-section-label">Conta</li>
+            <li><a href="/perfil/<%= user.username || user.id %>"><i class="fas fa-user-circle"></i> Meu Perfil</a></li>
+            <li><a href="/conquistas" data-translate="sidebar.conquistas"><i class="fas fa-trophy"></i> Conquistas</a></li>
+            <li><a href="/meu-plano" data-translate="sidebar.plano"><i class="fas fa-file-alt"></i> Meu Plano</a></li>
+            <li><a href="/config" data-translate="sidebar.config"><i class="fas fa-cog"></i> Configurações</a></li>
+            <li>
+                <button class="sidebar-logout-btn" type="button" id="feed-logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Sair da conta
+                </button>
+            </li>
+        </ul>
+    </section>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <section class="aluno-main">
+        <section class="feed-layout">
+
+            <!-- Coluna Central -->
+            <section class="feed-col">
+
+                <section class="feed-header">
+                    <h1>Feed</h1>
+                </section>
+
+                <section class="feed-compose">
+                    <img class="feed-compose-avatar"
+                        src="<%= user.profile_photo || '/images/avatar.png' %>"
+                        alt="<%= user.nome %>">
+                    <input class="feed-compose-input"
+                        type="text"
+                        placeholder="O que você está pensando?"
+                        disabled>
+                </section>
+                <section class="feed-compose-footer">
+                    <button class="feed-compose-btn" disabled>Postar</button>
+                </section>
+
+                <section class="feed-empty">
+                    <i class="fas fa-users"></i>
+                    <h3>Seu feed está vazio</h3>
+                    <p>Adicione amigos para ver treinos, conquistas e check-ins</p>
+                    <section class="feed-empty-actions">
+                        <a href="/buscar">
+                            <i class="fas fa-search"></i> Buscar pessoas
+                        </a>
+                        <a href="/u/<%= user.username %>">
+                            <i class="fas fa-user"></i> Ver meu perfil
+                        </a>
+                    </section>
+                </section>
+
+            </section>
+
+            <!-- Coluna Direita -->
+            <section class="feed-sidebar">
+
+                <!-- Busca -->
+                <section class="feed-widget" style="position:relative">
+                    <section class="feed-search-wrap">
+                        <i class="fas fa-search feed-search-icon"></i>
+                        <input type="text" id="feed-search-input"
+                            class="feed-search-input"
+                            placeholder="Buscar pessoas ou treinos"
+                            autocomplete="off">
+                    </section>
+                    <section id="feed-search-dropdown" class="feed-search-dropdown" style="display:none"></section>
+                </section>
+
+                <!-- Pessoas que você talvez conheça -->
+                <section class="feed-widget" id="widget-sugestoes">
+                    <h3 class="feed-widget-title">Pessoas que você talvez conheça</h3>
+                    <section id="sugestoes-list">
+                        <section class="feed-widget-loading"><i class="fas fa-spinner fa-spin"></i></section>
+                    </section>
+                </section>
+
+                <!-- Treinos Populares -->
+                <section class="feed-widget" id="widget-treinos">
+                    <h3 class="feed-widget-title">Treinos Populares</h3>
+                    <section id="treinos-list">
+                        <section class="feed-widget-loading"><i class="fas fa-spinner fa-spin"></i></section>
+                    </section>
+                </section>
+
+            </section>
+
+        </section>
+    </section>
+</section>
+
+<script>
+// ── Helper: negrito no termo buscado ─────────────────────────────────────────
+function destacar(texto, termo) {
+    if (!texto || !termo) return texto || '';
+    const re = new RegExp('(' + termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return texto.replace(re, '<strong style="color:#f0f0f0">$1</strong>');
+}
+
+// ── Busca com dropdown ────────────────────────────────────────────────────────
+let buscarTimer;
+const searchInput = document.getElementById('feed-search-input');
+const dropdown    = document.getElementById('feed-search-dropdown');
+
+searchInput.addEventListener('input',   () => feedBuscar(searchInput.value));
+searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') feedBuscarPagina(searchInput.value); });
+
+function feedBuscar(q) {
+    clearTimeout(buscarTimer);
+    if (!q.trim()) { dropdown.style.display = 'none'; return; }
+
+    buscarTimer = setTimeout(async () => {
+        dropdown.style.display = 'block';
+        dropdown.innerHTML = '<section class="feed-widget-loading"><i class="fas fa-spinner fa-spin"></i></section>';
+
+        const [rPessoas, rTreinos] = await Promise.all([
+            fetch('/api/usuarios/buscar?q=' + encodeURIComponent(q) + '&limit=3').then(r => r.json()).catch(() => ({ usuarios: [] })),
+            fetch('/api/treinos/buscar?q='  + encodeURIComponent(q) + '&limit=3').then(r => r.json()).catch(() => ({ treinos: [] })),
+        ]);
+
+        let html = '';
+
+        if (rPessoas.usuarios?.length) {
+            html += '<section class="feed-search-section"><section class="feed-search-section-title">Pessoas</section>';
+            html += rPessoas.usuarios.map(u => `
+                <a href="/u/${u.username}" class="feed-search-item">
+                    <img src="${u.foto_perfil || '/images/avatar.png'}" class="feed-search-avatar" alt="${u.nome}">
+                    <section>
+                        <section class="feed-search-name">${destacar(u.nome, q)}</section>
+                        <section class="feed-search-sub">@${destacar(u.username, q)}</section>
+                    </section>
+                </a>`).join('');
+            html += '</section>';
+        }
+
+        if (rTreinos.treinos?.length) {
+            html += '<section class="feed-search-section"><section class="feed-search-section-title">Treinos</section>';
+            html += rTreinos.treinos.map(t => `
+                <a href="/treinos/${t.id}" class="feed-search-item">
+                    <section class="feed-search-treino-icon"><i class="fas fa-dumbbell"></i></section>
+                    <section>
+                        <section class="feed-search-name">${destacar(t.nome, q)}</section>
+                        <section class="feed-search-sub">${t.total_exercicios} exercícios · ${t.total_execucoes} execuções</section>
+                    </section>
+                </a>`).join('');
+            html += '</section>';
+        }
+
+        if (!rPessoas.usuarios?.length && !rTreinos.treinos?.length) {
+            html = '<section style="padding:16px;text-align:center;color:#555;font-size:0.875rem">Nenhum resultado</section>';
+        } else {
+            html += `<a href="/buscar?q=${encodeURIComponent(q)}" class="feed-search-ver-todos">Ver todos os resultados →</a>`;
+        }
+
+        dropdown.innerHTML = html;
+    }, 350);
+}
+
+function feedBuscarPagina(q) {
+    if (q.trim()) window.location.href = '/buscar?q=' + encodeURIComponent(q);
+}
+
+document.addEventListener('click', e => {
+    if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+    }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') dropdown.style.display = 'none'; });
+
+// ── Sugestões de pessoas ──────────────────────────────────────────────────────
+fetch('/api/feed/sugestoes')
+    .then(r => r.json())
+    .then(data => {
+        const el = document.getElementById('sugestoes-list');
+        if (!data.sugestoes?.length) {
+            el.innerHTML = '<section class="feed-widget-loading">Nenhuma sugestão no momento</section>';
+            return;
+        }
+        el.innerHTML = data.sugestoes.map(u => `
+            <section class="sugestao-card">
+                <a href="/u/${u.username}">
+                    <img src="${u.foto_perfil || '/images/avatar.png'}" class="sugestao-avatar" alt="${u.nome}">
+                </a>
+                <section class="sugestao-info">
+                    <section class="sugestao-nome">${u.nome}</section>
+                    <section class="sugestao-username">@${u.username}</section>
+                </section>
+                <button class="sugestao-btn" data-user-id="${u.id}">Seguir</button>
+            </section>
+        `).join('');
+    })
+    .catch(() => {
+        document.getElementById('sugestoes-list').innerHTML = '<section class="feed-widget-loading">Erro ao carregar</section>';
+    });
+
+// ── Treinos populares ─────────────────────────────────────────────────────────
+fetch('/api/feed/treinos-populares')
+    .then(r => r.json())
+    .then(data => {
+        const el = document.getElementById('treinos-list');
+        if (!data.treinos?.length) {
+            el.innerHTML = '<section class="feed-widget-loading">Nenhum treino público ainda</section>';
+            return;
+        }
+        el.innerHTML = data.treinos.map(t => `
+            <a href="/treinos/${t.id}" class="treino-popular-card">
+                <section class="treino-popular-icon"><i class="fas fa-dumbbell"></i></section>
+                <section style="flex:1;min-width:0">
+                    <section class="treino-popular-nome">${t.nome}</section>
+                    <section class="treino-popular-meta">
+                        <span><i class="fas fa-list"></i> ${t.total_exercicios} exercícios</span>
+                        <span><i class="fas fa-play"></i> ${t.total_execucoes} execuções</span>
+                    </section>
+                    <section style="font-size:0.72rem;color:#555;margin-top:3px">
+                        por ${t.criador_username ? '@' + t.criador_username : t.criador_nome}
+                    </section>
+                </section>
+            </a>
+        `).join('');
+    })
+    .catch(() => {
+        document.getElementById('treinos-list').innerHTML = '<section class="feed-widget-loading">Erro ao carregar</section>';
+    });
+
+// ── Amizades ──────────────────────────────────────────────────────────────────
+document.getElementById('sugestoes-list').addEventListener('click', async e => {
+    const btn = e.target.closest('.sugestao-btn');
+    if (!btn || btn.disabled) return;
+    const userId = btn.dataset.userId;
+    btn.disabled = true;
+    btn.textContent = '...';
+    const r = await fetch(`/api/amizades/solicitar/${userId}`, { method: 'POST' })
+        .then(x => x.json()).catch(() => ({ ok: false }));
+    if (r.ok) {
+        btn.textContent = 'Enviado';
+        btn.style.opacity = '0.5';
+    } else {
+        btn.textContent = 'Seguir';
+        btn.disabled = false;
+    }
+});
+
+// Logout button (sem onclick inline)
+document.getElementById('feed-logout-btn')?.addEventListener('click', () => abrirModalLogout());
+</script>
+
+</body>
+</html>

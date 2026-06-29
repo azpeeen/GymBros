@@ -1,6 +1,7 @@
 // router.js
 const express    = require('express');
 const router     = express.Router();
+const crypto     = require('crypto');
 const path       = require('path');
 const multer     = require('multer');
 const QRCode     = require('qrcode');
@@ -20,7 +21,8 @@ const Payment     = require('../models/Payment');
 const ImcProfile  = require('../models/ImcProfile');
 const BodyPhoto   = require('../models/BodyPhoto');
 const i18n        = require('../config/i18n');
-const { broadcast, onlineUsers, addTicketClient, broadcastTicket } = require('../events');
+const { broadcast, onlineUsers, addTicketClient, broadcastTicket, emitToUser, registerUserSSE, unregisterUserSSE } = require('../events');
+const { criarNotificacao } = require('../services/notificacoes');
 const cloudinary = require('../config/cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const requirePlanLevel = require('../middleware/requirePlanLevel');
@@ -479,6 +481,95 @@ function safeJson(str, fallback) {
     } catch (err) {
         if (err.errno !== 1060) console.error('[migration] alter ticket status:', err.message);
     }
+
+    // F1 — colunas de perfil social e gamificação
+    for (const sql of [
+        'ALTER TABLE user ADD COLUMN qr_token      VARCHAR(64) UNIQUE NULL',
+        'ALTER TABLE user ADD COLUMN perfil_publico TINYINT(1) NOT NULL DEFAULT 1',
+        'ALTER TABLE user ADD COLUMN xp_total      INT NOT NULL DEFAULT 0',
+        'ALTER TABLE user ADD COLUMN nivel         INT NOT NULL DEFAULT 1',
+        'ALTER TABLE user ADD COLUMN streak_atual  INT NOT NULL DEFAULT 0',
+        'ALTER TABLE user ADD COLUMN streak_maximo INT NOT NULL DEFAULT 0',
+        "ALTER TABLE user ADD COLUMN status_conta  ENUM('ativo','banido','suspenso') NOT NULL DEFAULT 'ativo'",
+        'ALTER TABLE user ADD COLUMN first_login   TINYINT(1) NOT NULL DEFAULT 1',
+    ]) {
+        try { await db.execute(sql); }
+        catch (err) { if (err.errno !== 1060) console.error('[migration] F1 user cols:', err.message); }
+    }
+    try {
+        await db.execute(`
+            UPDATE user
+            SET qr_token = HEX(UNHEX(MD5(CONCAT(id, email, RAND()))))
+            WHERE qr_token IS NULL
+        `);
+        console.log('[migration] qr_token gerado para usuários existentes');
+    } catch (err) {
+        console.error('[migration] qr_token update:', err.message);
+    }
+
+    // F2 — visibilidade nos planos de treino
+    try {
+        await db.execute(
+            "ALTER TABLE workout_plans ADD COLUMN visibilidade ENUM('privado','publico') NOT NULL DEFAULT 'privado'"
+        );
+        console.log('[migration] workout_plans.visibilidade adicionada');
+    } catch (err) {
+        if (err.errno !== 1060) console.error('[migration] workout_plans visibilidade:', err.message);
+    }
+
+    // F2 fix — mudar default para 'publico' e publicar treinos já existentes
+    try {
+        await db.execute(
+            "ALTER TABLE workout_plans MODIFY COLUMN visibilidade ENUM('privado','publico') NOT NULL DEFAULT 'publico'"
+        );
+        await db.execute(
+            "UPDATE workout_plans SET visibilidade = 'publico' WHERE visibilidade = 'privado'"
+        );
+        console.log('[migration] workout_plans.visibilidade default -> publico, treinos existentes publicados');
+    } catch (err) {
+        console.error('[migration] workout_plans visibilidade default:', err.message);
+    }
+
+    // F4 — tabela de amizades
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS friendship (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                solicitante_id INT NOT NULL,
+                destinatario_id INT NOT NULL,
+                status ENUM('pendente','aceito','recusado','bloqueado') NOT NULL DEFAULT 'pendente',
+                criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_friendship (solicitante_id, destinatario_id),
+                KEY idx_friendship_dest (destinatario_id),
+                KEY idx_friendship_status (status)
+            )
+        `);
+        console.log('[migration] friendship table OK');
+    } catch (err) {
+        if (err.errno !== 1050) console.error('[migration] friendship:', err.message);
+    }
+
+    // F9 — tabela de notificações sociais
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS notificacao_social (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT NOT NULL,
+                tipo VARCHAR(50) NOT NULL,
+                titulo VARCHAR(255) NOT NULL,
+                mensagem TEXT,
+                lida TINYINT(1) NOT NULL DEFAULT 0,
+                dados_extras JSON,
+                criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_ns_usuario (usuario_id),
+                KEY idx_ns_lida (lida)
+            )
+        `);
+        console.log('[migration] notificacao_social table OK');
+    } catch (err) {
+        if (err.errno !== 1050) console.error('[migration] notificacao_social:', err.message);
+    }
 })();
 
 // Soft delete cron — anonimiza contas com deletion_scheduled_at vencido (a cada 24h)
@@ -626,17 +717,104 @@ function validarCPF(cpf) {
 // ====================
 
 // Páginas públicas
-router.get('/', (req, res) => res.render('pages/index', { seo: {
+// Landing pública — acessível sem login
+router.get('/landing', (req, res) => res.render('pages/index', { seo: {
     title:         'GymBros — Treino Inteligente com IA',
     description:   'Treine com inteligência artificial ao seu lado. Planos de treino, dieta e acompanhamento personalizados com o GymBros. A partir de R$ 29,90/mês.',
     keywords:      'treino inteligente, personal trainer ia, gymbros, treinos online, saúde, bem-estar, ia fitness',
-    canonical:     '/',
+    canonical:     '/landing',
     ogTitle:       'GymBros — Treino Inteligente com IA',
     ogDescription: 'Planos de treino e dieta personalizados por IA. Comece agora.',
 }}));
 
+// Landing pública — sempre acessível, logado ou não
+router.get('/', (req, res) => {
+    res.render('pages/index', {
+        seo: {
+            title:         'GymBros — Treino Inteligente com IA',
+            description:   'Treine com inteligência artificial ao seu lado. Planos de treino, dieta e acompanhamento personalizados com o GymBros. A partir de R$ 29,90/mês.',
+            keywords:      'treino inteligente, personal trainer ia, gymbros, treinos online, saúde, bem-estar, ia fitness',
+            canonical:     '/',
+            robots:        'index, follow',
+            ogTitle:       'GymBros — Treino Inteligente com IA',
+            ogDescription: 'Planos de treino e dieta personalizados por IA. Comece agora.',
+        },
+    });
+});
+
+router.get('/feed', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    try {
+        const [[userData]] = await db.execute(
+            'SELECT id, nome, username, profile_photo FROM user WHERE id = ?',
+            [userId]
+        );
+        res.render('pages/feed', {
+            user:    { ...req.session.user, ...(userData || {}) },
+            posts:   [],
+            hasMore: false,
+            page:    'feed',
+            seo: { title: 'Feed — GymBros', canonical: '/feed', robots: 'noindex, nofollow' },
+        });
+    } catch (err) {
+        console.error('[feed]', err.message);
+        res.render('pages/feed', {
+            user:    req.session.user,
+            posts:   [],
+            hasMore: false,
+            page:    'feed',
+            seo: { title: 'Feed — GymBros', canonical: '/feed', robots: 'noindex, nofollow' },
+        });
+    }
+});
+
+router.get('/buscar', requireAuth, (req, res) => {
+    const q   = (req.query.q   || '').trim();
+    const aba = ['treinos', 'assuntos'].includes(req.query.aba) ? req.query.aba : 'pessoas';
+    res.render('pages/buscar', {
+        user: req.session.user,
+        q,
+        aba,
+        seo: {
+            title:  q ? `Busca por "${q}" — GymBros` : 'Buscar — GymBros',
+            robots: 'noindex, nofollow',
+        },
+    });
+});
+
+router.get('/amizades', requireAuth, async (req, res) => {
+    try {
+        const uid = req.session.user.id;
+        const [amigos] = await db.execute(`
+            SELECT u.id, u.nome, u.username, u.profile_photo AS foto_perfil, f.id AS friendship_id
+            FROM friendship f
+            JOIN user u ON u.id = IF(f.solicitante_id = ?, f.destinatario_id, f.solicitante_id)
+            WHERE (f.solicitante_id = ? OR f.destinatario_id = ?)
+              AND f.status = 'aceito'
+              AND u.status = 'ativo'
+            ORDER BY u.nome
+        `, [uid, uid, uid]);
+        const [solicitacoes] = await db.execute(`
+            SELECT u.id, u.nome, u.username, u.profile_photo AS foto_perfil, f.id AS friendship_id
+            FROM friendship f
+            JOIN user u ON u.id = f.solicitante_id
+            WHERE f.destinatario_id = ?
+              AND f.status = 'pendente'
+              AND u.status = 'ativo'
+            ORDER BY f.criado_em DESC
+        `, [uid]);
+        res.render('pages/amizades', {
+            user: req.session.user, amigos, solicitacoes,
+            seo: { title: 'Amigos — GymBros', canonical: '/amizades', description: 'Seus amigos no GymBros' },
+        });
+    } catch (err) {
+        console.error('[/amizades]', err.message);
+        res.redirect('/feed');
+    }
+});
+
 router.get('/login', (req, res) => {
-    if (req.session.user) return res.redirect('/area-aluno');
+    if (req.session.user) return res.redirect('/metricas');
     res.render('pages/login', { seo: {
         title:         'Login — GymBros',
         description:   'Acesse sua conta GymBros para ver seus treinos, acompanhar sua evolução e usar o personal trainer IA GymBot.',
@@ -649,7 +827,7 @@ router.get('/login', (req, res) => {
 });
 
 router.get('/register', (req, res) => {
-    if (req.session.user) return res.redirect('/area-aluno');
+    if (req.session.user) return res.redirect('/');
     res.render('pages/register', { user: req.session.user || null, seo: {
         title:         'Cadastro — GymBros',
         description:   'Crie sua conta GymBros gratuitamente e acesse treinos personalizados, planos de dieta e o personal trainer IA GymBot.',
@@ -1002,6 +1180,39 @@ router.get('/area-aluno', requirePlano, async (req, res) => {
             user: req.session.user,
             totalConquistas: 0, checkinsNaSemana: 0, metaSemanal: 0, ultimasConquistas: [],
             seo: { title: 'Painel do Aluno — GymBros', canonical: '/area-aluno', robots: 'noindex, nofollow', description: 'Painel do aluno GymBros.' },
+        });
+    }
+});
+
+// Métricas — antiga página inicial movida para /metricas
+router.get('/metricas', requirePlano, async (req, res) => {
+    if (!req.session.user.imc) {
+        return res.redirect('/imc-form?primeiro=1');
+    }
+    const uid = req.session.user.id;
+    try {
+        const [[extraRow], [[cqRow]], [[semanaRow]], ultimasConqRows] = await Promise.all([
+            db.execute('SELECT last_imc_update, last_avaliacao_update, notification_interval_days FROM user WHERE id = ?', [uid]),
+            db.execute('SELECT COUNT(*) as total FROM usuario_conquistas WHERE user_id = ?', [uid]),
+            db.execute('SELECT COUNT(*) as semana FROM treino_checkins WHERE user_id = ? AND YEARWEEK(created_at, 1) = YEARWEEK(NOW(), 1)', [uid]),
+            db.execute(`SELECT c.nome, c.icone, c.tier FROM usuario_conquistas uc JOIN conquistas c ON c.id = uc.conquista_id WHERE uc.user_id = ? ORDER BY uc.desbloqueada_em DESC LIMIT 2`, [uid]),
+        ]);
+        const extra             = extraRow[0] || {};
+        const totalConquistas   = cqRow?.total || 0;
+        const checkinsNaSemana  = semanaRow?.semana || 0;
+        const metaSemanal       = Math.min(Math.round((checkinsNaSemana / 5) * 100), 100);
+        const ultimasConquistas = ultimasConqRows[0] || [];
+        res.render('pages/area-aluno', {
+            user: { ...req.session.user, ...extra },
+            totalConquistas, checkinsNaSemana, metaSemanal, ultimasConquistas,
+            seo: { title: 'Minhas Métricas — GymBros', canonical: '/metricas', robots: 'noindex, nofollow', description: 'Métricas do aluno GymBros.' },
+        });
+    } catch (err) {
+        console.error('[metricas]', err);
+        res.render('pages/area-aluno', {
+            user: req.session.user,
+            totalConquistas: 0, checkinsNaSemana: 0, metaSemanal: 0, ultimasConquistas: [],
+            seo: { title: 'Minhas Métricas — GymBros', canonical: '/metricas', robots: 'noindex, nofollow', description: 'Métricas do aluno GymBros.' },
         });
     }
 });
@@ -1910,7 +2121,7 @@ router.post('/imc-save', requireAuth, async (req, res) => {
             hidratacao, seletividade, alimentosSeletividade,
         };
 
-        return res.json({ mensagem: 'Perfil salvo com sucesso! Redirecionando...', redirect: '/area-aluno' });
+        return res.json({ mensagem: 'Perfil salvo com sucesso! Redirecionando...', redirect: '/' });
     } catch (err) {
         console.error('[imc-save]', err);
         return res.status(500).json({ erro: 'Erro ao salvar perfil.' });
@@ -2065,14 +2276,45 @@ router.get('/perfil/:id', async (req, res) => {
 
         const isProprioPerfilId = !!(req.session.user && String(req.session.user.id) === String(u.id));
 
+        let amizadeStatus = null;
+        let amizadeId = null;
+        let amizadeSolicitanteId = null;
+        if (req.session.user && !isProprioPerfilId) {
+            const uid = req.session.user.id;
+            const [fRows] = await db.execute(
+                `SELECT id, status, solicitante_id FROM friendship
+                 WHERE (solicitante_id = ? AND destinatario_id = ?)
+                    OR (solicitante_id = ? AND destinatario_id = ?)`,
+                [uid, u.id, u.id, uid]
+            );
+            if (fRows.length) {
+                amizadeStatus = fRows[0].status;
+                amizadeId = fRows[0].id;
+                amizadeSolicitanteId = fRows[0].solicitante_id;
+            }
+        }
+
+        const uid = req.session.user?.id;
+        const convStatus = amizadeStatus === 'aceito'   ? 'friends'
+                         : amizadeStatus === 'pendente' && String(amizadeSolicitanteId) === String(uid) ? 'pending_sent'
+                         : amizadeStatus === 'pendente' ? 'pending_received'
+                         : 'none';
         res.render('pages/perfil-publico', {
             user:              req.session.user || null,
+            visitante:         req.session.user || null,
+            isDono:            isProprioPerfilId,
             perfil:            u,
             conquistas:        desbloqueadas,
             conquistasHero,
             totalSessoes,
             streak,
             isProprioPerfilId,
+            amizadeStatus,
+            amizadeId,
+            amizadeSolicitanteId,
+            statusAmizade:     convStatus,
+            fsId:              amizadeId,
+            perfilId:          u.id,
             seo: { title: `Perfil de ${u.nome} — GymBros`, canonical: `/perfil/${u.id}`, description: `Veja as conquistas de ${u.nome} no GymBros.` },
         });
     } catch (err) {
@@ -2458,16 +2700,10 @@ router.get('/admin-usuarios', (req, res) => {
 
 // Logout — POST evita logout acidental por crawler/prefetch
 router.post('/logout', (req, res) => {
-    const uid = (req.session.user?.cpf || '').replace(/\D/g, '');
     req.session.destroy(err => {
         if (err) console.error(err);
         res.clearCookie('connect.sid');
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>
-try {
-    ['gymbros_treinos_${uid}','gymbros_evolucao_${uid}','gymbros_imc_profile_${uid}'].forEach(k => localStorage.removeItem(k));
-} catch(e){}
-location.href='/';
-</script></body></html>`);
+        res.redirect('/');
     });
 });
 
@@ -2580,6 +2816,7 @@ router.post('/login',
             nome:                       user.nome,
             email:                      user.email,
             cpf:                        user.cpf,
+            username:                   user.username || null,
             plano:                      plano?.nome  || null,
             planoId:                    plano?.id    || null,
             planoSlug:                  plano?.slug  || null,
@@ -2602,7 +2839,7 @@ router.post('/login',
 
         broadcast('user_online', { id: user.id, nome: user.nome, email: user.email });
 
-        const safeRedirect = (redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')) ? redirectTo : '/area-aluno';
+        const safeRedirect = (redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')) ? redirectTo : '/feed';
         req.session.save(err => {
             if (err) {
                 console.error('[login] session save error:', err);
@@ -3400,6 +3637,663 @@ router.post('/academias/cadastro', [
         console.error('[cadastro-academia]', err);
         const msg = err.code === 'ER_DUP_ENTRY' ? 'Este e-mail de gestor já está cadastrado no sistema.' : 'Erro ao registrar academia. Tente novamente.';
         res.render('pages/academia-cadastro', { erro: msg });
+    }
+});
+
+// ─── F2: Busca de treinos públicos ───────────────────────────────────────────
+
+router.get('/api/treinos/buscar', requireAuth, async (req, res) => {
+    const q      = (req.query.q || '').trim();
+    const limit  = Math.min(parseInt(req.query.limit) || 20, 50);
+    const page   = Math.max(1, parseInt(req.query.page) || 1);
+    const offset = (page - 1) * limit;
+
+    try {
+        const like   = `%${q}%`;
+        const params = q
+            ? [req.session.user.id, like, like, like]
+            : [req.session.user.id];
+
+        const [treinos] = await db.execute(`
+            SELECT
+                wp.id,
+                wp.nome,
+                wp.descricao,
+                u.id            AS criador_id,
+                u.nome          AS criador_nome,
+                u.username      AS criador_username,
+                u.profile_photo AS criador_foto,
+                JSON_LENGTH(wp.exercicios_json)           AS total_exercicios,
+                COUNT(DISTINCT ts.id)                      AS total_execucoes
+            FROM workout_plans wp
+            JOIN user u ON u.id = wp.user_id
+            LEFT JOIN treino_sessao ts ON ts.workout_plan_id = wp.id AND ts.status = 'completo'
+            WHERE wp.visibilidade = 'publico'
+              AND wp.user_id != ?
+              ${q ? 'AND (wp.nome LIKE ? OR u.nome LIKE ? OR u.username LIKE ?)' : ''}
+            GROUP BY wp.id
+            ORDER BY total_execucoes DESC, wp.created_at DESC
+            LIMIT ${limit} OFFSET ${offset}
+        `, params);
+
+        const countParams = q ? [req.session.user.id, like, like, like] : [req.session.user.id];
+        const [[{ total }]] = await db.execute(`
+            SELECT COUNT(*) AS total FROM workout_plans wp
+            JOIN user u ON u.id = wp.user_id
+            WHERE wp.visibilidade = 'publico' AND wp.user_id != ?
+            ${q ? 'AND (wp.nome LIKE ? OR u.nome LIKE ? OR u.username LIKE ?)' : ''}
+        `, countParams);
+
+        res.json({ treinos, total, page, totalPaginas: Math.ceil(total / limit) });
+    } catch (err) {
+        console.error('[/api/treinos/buscar]', err.message);
+        res.json({ treinos: [], total: 0 });
+    }
+});
+
+// ─── F2: Sugestões de pessoas ─────────────────────────────────────────────────
+
+router.get('/api/feed/sugestoes', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    try {
+        let sugestoes = [];
+
+        // Tentativa 1: amigos de amigos (tabela friendship pode não existir)
+        try {
+            const [amigosDeAmigos] = await db.execute(`
+                SELECT DISTINCT u.id, u.nome, u.username, u.profile_photo AS foto_perfil, u.bio
+                FROM friendship f1
+                JOIN friendship f2 ON f2.user_id = f1.friend_id AND f2.status = 'accepted'
+                JOIN user u ON u.id = f2.friend_id
+                WHERE f1.user_id = ? AND f1.status = 'accepted'
+                  AND f2.friend_id != ?
+                  AND u.status = 'ativo'
+                  AND u.username IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM friendship fx
+                      WHERE (fx.user_id = ? AND fx.friend_id = u.id)
+                         OR (fx.user_id = u.id AND fx.friend_id = ?)
+                  )
+                ORDER BY RAND() LIMIT 5
+            `, [userId, userId, userId, userId]);
+            sugestoes = amigosDeAmigos;
+        } catch (_) { /* friendship ainda não existe */ }
+
+        // Fallback: usuários aleatórios com username
+        if (sugestoes.length < 3) {
+            const idsJa  = sugestoes.map(s => s.id).concat([userId]);
+            const ph     = idsJa.map(() => '?').join(',');
+            const needed = 5 - sugestoes.length;
+            const [random] = await db.execute(`
+                SELECT id, nome, username, profile_photo AS foto_perfil, bio
+                FROM user
+                WHERE id NOT IN (${ph})
+                  AND status = 'ativo'
+                  AND username IS NOT NULL
+                ORDER BY RAND()
+                LIMIT ${needed}
+            `, idsJa);
+            sugestoes = [...sugestoes, ...random];
+        }
+
+        res.json({ sugestoes });
+    } catch (err) {
+        console.error('[/api/feed/sugestoes]', err.message);
+        res.json({ sugestoes: [] });
+    }
+});
+
+// ─── F2: Treinos populares ────────────────────────────────────────────────────
+
+router.get('/api/feed/treinos-populares', requireAuth, async (req, res) => {
+    try {
+        const [treinos] = await db.execute(`
+            SELECT
+                wp.id,
+                wp.nome,
+                u.nome          AS criador_nome,
+                u.username      AS criador_username,
+                u.profile_photo AS criador_foto,
+                JSON_LENGTH(wp.exercicios_json) AS total_exercicios,
+                COUNT(DISTINCT ts.id)            AS total_execucoes
+            FROM workout_plans wp
+            JOIN user u ON u.id = wp.user_id
+            LEFT JOIN treino_sessao ts ON ts.workout_plan_id = wp.id AND ts.status = 'completo'
+            WHERE wp.visibilidade = 'publico' AND wp.user_id != ?
+            GROUP BY wp.id
+            ORDER BY total_execucoes DESC, total_exercicios DESC
+            LIMIT 5
+        `, [req.session.user.id]);
+
+        res.json({ treinos });
+    } catch (err) {
+        console.error('[/api/feed/treinos-populares]', err.message);
+        res.json({ treinos: [] });
+    }
+});
+
+// ─── F1: Perfil público por @username ────────────────────────────────────────
+
+router.get('/u/:username', async (req, res) => {
+    const { username } = req.params;
+    try {
+        const [uRows] = await db.execute(
+            `SELECT id, nome, username, bio, profile_photo, status, created_at, instagram_username
+             FROM user WHERE username = ? AND status = 'ativo' LIMIT 1`,
+            [username]
+        );
+        if (!uRows.length) return res.status(404).render('pages/404', { user: req.session.user || null });
+        const u = uRows[0];
+
+        const visitante = req.session.user || null;
+        const isDono = !!(visitante && String(visitante.id) === String(u.id));
+
+        const lista = await conquistas.getConquistasUsuario(u.id);
+        const desbloqueadas = lista.filter(c => c.desbloqueada);
+
+        const [[{ totalSessoes }]] = await db.execute(
+            'SELECT COUNT(*) as totalSessoes FROM treino_sessao WHERE user_id = ? AND status = "completo"',
+            [u.id]
+        );
+
+        const [conquistasHero] = await db.execute(
+            `SELECT c.slug, c.nome, c.tier, c.icone
+             FROM usuario_conquistas uc
+             JOIN conquistas c ON c.id = uc.conquista_id
+             WHERE uc.user_id = ?
+             ORDER BY uc.desbloqueada_em DESC LIMIT 3`,
+            [u.id]
+        );
+
+        const [checkinRows] = await db.execute(
+            `SELECT DATE(created_at) as dia FROM treino_checkins
+             WHERE user_id = ? GROUP BY DATE(created_at) ORDER BY dia DESC LIMIT 60`,
+            [u.id]
+        );
+        let streak = 0;
+        let diaAnterior = null;
+        for (const row of checkinRows) {
+            const dia = new Date(row.dia);
+            if (!diaAnterior) { streak = 1; }
+            else {
+                const diff = (diaAnterior - dia) / (1000 * 60 * 60 * 24);
+                if (diff === 1) streak++;
+                else break;
+            }
+            diaAnterior = dia;
+        }
+
+        let statusAmizade = 'none';
+        let fsId = null;
+        if (visitante && !isDono) {
+            try {
+                const vid = visitante.id;
+                const [fRows] = await db.execute(
+                    `SELECT id, status, solicitante_id FROM friendship
+                     WHERE (solicitante_id = ? AND destinatario_id = ?)
+                        OR (solicitante_id = ? AND destinatario_id = ?)
+                     LIMIT 1`,
+                    [vid, u.id, u.id, vid]
+                );
+                if (fRows.length) {
+                    const f = fRows[0];
+                    fsId = f.id;
+                    if (f.status === 'aceito') statusAmizade = 'friends';
+                    else if (f.status === 'bloqueado') statusAmizade = 'blocked';
+                    else if (String(f.solicitante_id) === String(vid)) statusAmizade = 'pending_sent';
+                    else statusAmizade = 'pending_received';
+                }
+            } catch (_) {}
+        }
+
+        res.render('pages/perfil-publico', {
+            user:              visitante,
+            visitante,
+            isDono,
+            perfil:            u,
+            conquistas:        desbloqueadas,
+            conquistasHero,
+            totalSessoes,
+            streak,
+            statusAmizade,
+            fsId,
+            perfilId:          u.id,
+            isProprioPerfilId: isDono,
+            seo: {
+                title:       `${u.nome} (@${u.username}) — GymBros`,
+                description: u.bio || `Perfil de ${u.nome} no GymBros`,
+                canonical:   `/u/${u.username}`,
+                robots:      'index, follow',
+            },
+        });
+    } catch (err) {
+        console.error('[/u/:username]', err.message);
+        res.status(500).redirect('/');
+    }
+});
+
+// ─── F1: QR Code — redireciona para /perfil/:username ────────────────────────
+
+router.get('/qr/:token', async (req, res) => {
+    try {
+        const [[user]] = await db.execute(
+            'SELECT username FROM user WHERE qr_token = ? LIMIT 1',
+            [req.params.token]
+        );
+        if (!user || !user.username) return res.redirect('/');
+        res.redirect(`/perfil/${user.username}`);
+    } catch (err) {
+        res.redirect('/');
+    }
+});
+
+// ─── F1: APIs de perfil ───────────────────────────────────────────────────────
+
+router.post('/api/perfil/username', requireAuth, async (req, res) => {
+    const { username } = req.body;
+    if (!username || !/^[a-z0-9_]{3,30}$/.test(username)) {
+        return res.json({ ok: false, erro: 'Username inválido. Use 3-30 caracteres: letras minúsculas, números e _' });
+    }
+    try {
+        const [[existe]] = await db.execute(
+            'SELECT id FROM user WHERE username = ? AND id != ?',
+            [username, req.session.user.id]
+        );
+        if (existe) return res.json({ ok: false, erro: 'Username já está em uso.' });
+
+        const { moderarTexto } = require('../services/moderacao');
+        const mod = await moderarTexto(username, 'username');
+        if (mod.decisao === 'rejeitado') {
+            return res.json({ ok: false, erro: 'Username não permitido.' });
+        }
+
+        await db.execute('UPDATE user SET username = ? WHERE id = ?', [username, req.session.user.id]);
+        req.session.user.username = username;
+        res.json({ ok: true });
+    } catch (err) {
+        res.json({ ok: false, erro: 'Erro ao atualizar username.' });
+    }
+});
+
+router.post('/api/perfil/bio', requireAuth, async (req, res) => {
+    const bio = (req.body.bio || '').slice(0, 160).trim();
+    try {
+        await db.execute('UPDATE user SET bio = ? WHERE id = ?', [bio, req.session.user.id]);
+        res.json({ ok: true });
+    } catch (err) {
+        res.json({ ok: false, erro: 'Erro ao atualizar bio.' });
+    }
+});
+
+router.post('/api/perfil/visibilidade', requireAuth, async (req, res) => {
+    const publico = (req.body.publico === '1' || req.body.publico === true) ? 1 : 0;
+    try {
+        await db.execute('UPDATE user SET perfil_publico = ? WHERE id = ?', [publico, req.session.user.id]);
+        res.json({ ok: true });
+    } catch (err) {
+        res.json({ ok: false, erro: 'Erro ao atualizar visibilidade.' });
+    }
+});
+
+router.get('/api/perfil/check-username', requireAuth, async (req, res) => {
+    const u = (req.query.u || '').toLowerCase().trim();
+    if (!u) return res.json({ disponivel: false, motivo: 'invalid' });
+    if (!/^[a-z0-9_]{3,30}$/.test(u)) return res.json({ disponivel: false, motivo: 'invalid' });
+    try {
+        const [[existe]] = await db.execute(
+            'SELECT id FROM user WHERE username = ? AND id != ?',
+            [u, req.session.user.id]
+        );
+        res.json({ disponivel: !existe, motivo: existe ? 'taken' : null });
+    } catch (err) {
+        res.json({ disponivel: false, motivo: 'error' });
+    }
+});
+
+// ─── F1: Busca de usuários ────────────────────────────────────────────────────
+
+router.get('/api/usuarios/buscar', requireAuth, async (req, res) => {
+    const q = (req.query.q || '').trim();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = 20;
+    const offset = (page - 1) * limit;
+
+    if (!q) return res.json({ usuarios: [], total: 0 });
+
+    try {
+        const like = `%${q}%`;
+        const [usuarios] = await db.execute(`
+            SELECT id, nome, username, profile_photo AS foto_perfil, bio, nivel, streak_atual
+            FROM user
+            WHERE (nome LIKE ? OR username LIKE ?)
+              AND status = 'ativo'
+              AND username IS NOT NULL
+              AND id != ?
+            ORDER BY
+                CASE WHEN username = ? THEN 0
+                     WHEN username LIKE ? THEN 1
+                     ELSE 2 END,
+                nome ASC
+            LIMIT ${limit} OFFSET ${offset}
+        `, [like, like, req.session.user.id, q, `${q}%`]);
+
+        const [[{ total }]] = await db.execute(`
+            SELECT COUNT(*) AS total FROM user
+            WHERE (nome LIKE ? OR username LIKE ?)
+              AND status = 'ativo'
+              AND username IS NOT NULL
+              AND id != ?
+        `, [like, like, req.session.user.id]);
+
+        res.json({ usuarios, total, page, totalPaginas: Math.ceil(total / limit) });
+    } catch (err) {
+        console.error('[/api/usuarios/buscar]', err.message);
+        res.json({ usuarios: [], total: 0 });
+    }
+});
+
+// ─── Buscar: sugestões de pessoas ────────────────────────────────────────────
+
+router.get('/api/buscar/sugestoes-pessoas', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    try {
+        let sugestoes = [];
+
+        // Amigos de amigos (friendship pode não existir)
+        try {
+            const [r] = await db.execute(`
+                SELECT DISTINCT u.id, u.nome, u.username,
+                       u.profile_photo AS foto_perfil, u.bio, u.nivel, u.streak_atual
+                FROM friendship f1
+                JOIN friendship f2 ON f2.user_id = f1.friend_id AND f2.status = 'accepted'
+                JOIN user u ON u.id = f2.friend_id
+                WHERE f1.user_id = ? AND f1.status = 'accepted'
+                  AND f2.friend_id != ?
+                  AND u.status = 'ativo'
+                  AND u.username IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM friendship fx
+                    WHERE (fx.user_id = ? AND fx.friend_id = u.id)
+                       OR (fx.user_id = u.id AND fx.friend_id = ?)
+                  )
+                ORDER BY RAND() LIMIT 5
+            `, [userId, userId, userId, userId]);
+            sugestoes = r;
+        } catch (_) {}
+
+        // Fallback: qualquer usuário ativo
+        if (sugestoes.length < 3) {
+            const idsJa = sugestoes.map(s => s.id).concat([userId]);
+            const ph = idsJa.map(() => '?').join(',');
+            const needed = 6 - sugestoes.length;
+            const [r] = await db.execute(`
+                SELECT id, nome, username, profile_photo AS foto_perfil, bio, nivel, streak_atual
+                FROM user
+                WHERE id NOT IN (${ph})
+                  AND status = 'ativo' AND username IS NOT NULL
+                ORDER BY RAND() LIMIT ${needed}
+            `, idsJa);
+            sugestoes = [...sugestoes, ...r];
+        }
+
+        res.json({ sugestoes });
+    } catch (err) {
+        console.error('[/api/buscar/sugestoes-pessoas]', err.message);
+        res.json({ sugestoes: [] });
+    }
+});
+
+// ─── Buscar: "assuntos para você" — treinos por grupos musculares ─────────────
+
+router.get('/api/buscar/assuntos', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    try {
+        // Grupos musculares mais treinados pelo usuário
+        const [grupos] = await db.execute(`
+            SELECT e.body_part AS grupo, COUNT(*) AS total
+            FROM treino_sessao ts
+            JOIN treino_sessao_exercicio tse ON tse.sessao_id = ts.id
+            JOIN exercises e ON LOWER(e.name) = LOWER(tse.exercise_query)
+            WHERE ts.user_id = ? AND ts.status = 'completo'
+              AND e.body_part IS NOT NULL AND e.body_part != ''
+            GROUP BY e.body_part
+            ORDER BY total DESC
+            LIMIT 3
+        `, [userId]);
+
+        if (!grupos.length) {
+            return res.json({ treinos: [], grupos: [], semHistorico: true });
+        }
+
+        const gruposNomes = grupos.map(g => g.grupo);
+        const ph = gruposNomes.map(() => '?').join(',');
+
+        // Treinos públicos que usam esses grupos musculares (via sessões já registradas)
+        const [treinos] = await db.execute(`
+            SELECT wp.id, wp.nome,
+                u.nome          AS criador_nome,
+                u.username      AS criador_username,
+                u.profile_photo AS criador_foto,
+                JSON_LENGTH(wp.exercicios_json) AS total_exercicios,
+                (SELECT COUNT(*) FROM treino_sessao ts3
+                 WHERE ts3.workout_plan_id = wp.id AND ts3.status = 'completo') AS total_execucoes
+            FROM workout_plans wp
+            JOIN user u ON u.id = wp.user_id
+            WHERE wp.visibilidade = 'publico'
+              AND wp.user_id != ?
+              AND EXISTS (
+                SELECT 1 FROM treino_sessao ts2
+                JOIN treino_sessao_exercicio tse2 ON tse2.sessao_id = ts2.id
+                JOIN exercises e2 ON LOWER(e2.name) = LOWER(tse2.exercise_query)
+                WHERE ts2.workout_plan_id = wp.id
+                  AND ts2.status = 'completo'
+                  AND e2.body_part IN (${ph})
+              )
+            ORDER BY total_execucoes DESC
+            LIMIT 8
+        `, [userId, ...gruposNomes]);
+
+        res.json({ treinos, grupos: gruposNomes, semHistorico: false });
+    } catch (err) {
+        console.error('[/api/buscar/assuntos]', err.message);
+        res.json({ treinos: [], grupos: [], semHistorico: true });
+    }
+});
+
+// ─── F4: Amizades ────────────────────────────────────────────────────────────
+
+router.post('/api/amizades/solicitar/:userId', requireAuth, async (req, res) => {
+    try {
+        const uid     = req.session.user.id;
+        const alvoId  = parseInt(req.params.userId, 10);
+        if (uid === alvoId) return res.json({ ok: false, erro: 'Você não pode se adicionar' });
+
+        const [exists] = await db.execute(
+            `SELECT id, status FROM friendship
+             WHERE (solicitante_id = ? AND destinatario_id = ?)
+                OR (solicitante_id = ? AND destinatario_id = ?)`,
+            [uid, alvoId, alvoId, uid]
+        );
+        if (exists.length) return res.json({ ok: false, erro: 'Relação já existe', status: exists[0].status });
+
+        const [alvoRows] = await db.execute(
+            'SELECT id, nome FROM user WHERE id = ? AND status = "ativo"',
+            [alvoId]
+        );
+        if (!alvoRows.length) return res.json({ ok: false, erro: 'Usuário não encontrado' });
+
+        await db.execute(
+            'INSERT INTO friendship (solicitante_id, destinatario_id) VALUES (?, ?)',
+            [uid, alvoId]
+        );
+        await criarNotificacao(
+            alvoId,
+            'solicitacao_amizade',
+            'Nova solicitação de amizade',
+            `${req.session.user.nome} quer ser seu amigo`,
+            { solicitante_id: uid, solicitante_nome: req.session.user.nome }
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[/api/amizades/solicitar]', err.message);
+        res.json({ ok: false, erro: 'Erro interno' });
+    }
+});
+
+router.post('/api/amizades/:id/aceitar', requireAuth, async (req, res) => {
+    try {
+        const uid = req.session.user.id;
+        const fid = parseInt(req.params.id, 10);
+        const [rows] = await db.execute(
+            'SELECT * FROM friendship WHERE id = ? AND destinatario_id = ? AND status = "pendente"',
+            [fid, uid]
+        );
+        if (!rows.length) return res.json({ ok: false, erro: 'Solicitação não encontrada' });
+
+        await db.execute('UPDATE friendship SET status = "aceito" WHERE id = ?', [fid]);
+        await criarNotificacao(
+            rows[0].solicitante_id,
+            'amizade_aceita',
+            'Solicitação aceita',
+            `${req.session.user.nome} aceitou seu pedido de amizade`,
+            { amigo_id: uid, amigo_nome: req.session.user.nome }
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[/api/amizades/aceitar]', err.message);
+        res.json({ ok: false, erro: 'Erro interno' });
+    }
+});
+
+router.post('/api/amizades/:id/recusar', requireAuth, async (req, res) => {
+    try {
+        const uid = req.session.user.id;
+        const fid = parseInt(req.params.id, 10);
+        await db.execute(
+            'DELETE FROM friendship WHERE id = ? AND destinatario_id = ? AND status = "pendente"',
+            [fid, uid]
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[/api/amizades/recusar]', err.message);
+        res.json({ ok: false, erro: 'Erro interno' });
+    }
+});
+
+router.post('/api/amizades/:userId/bloquear', requireAuth, async (req, res) => {
+    try {
+        const uid    = req.session.user.id;
+        const alvoId = parseInt(req.params.userId, 10);
+        const [exists] = await db.execute(
+            `SELECT id FROM friendship
+             WHERE (solicitante_id = ? AND destinatario_id = ?)
+                OR (solicitante_id = ? AND destinatario_id = ?)`,
+            [uid, alvoId, alvoId, uid]
+        );
+        if (exists.length) {
+            await db.execute(
+                `UPDATE friendship SET status = 'bloqueado', solicitante_id = ?, destinatario_id = ?
+                 WHERE id = ?`,
+                [uid, alvoId, exists[0].id]
+            );
+        } else {
+            await db.execute(
+                "INSERT INTO friendship (solicitante_id, destinatario_id, status) VALUES (?, ?, 'bloqueado')",
+                [uid, alvoId]
+            );
+        }
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[/api/amizades/bloquear]', err.message);
+        res.json({ ok: false, erro: 'Erro interno' });
+    }
+});
+
+router.delete('/api/amizades/:userId', requireAuth, async (req, res) => {
+    try {
+        const uid    = req.session.user.id;
+        const alvoId = parseInt(req.params.userId, 10);
+        await db.execute(
+            `DELETE FROM friendship
+             WHERE (solicitante_id = ? AND destinatario_id = ?)
+                OR (solicitante_id = ? AND destinatario_id = ?)`,
+            [uid, alvoId, alvoId, uid]
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[/api/amizades/delete]', err.message);
+        res.json({ ok: false, erro: 'Erro interno' });
+    }
+});
+
+// ─── F9: Notificações Sociais ─────────────────────────────────────────────────
+
+router.get('/api/notificacoes/sociais/stream', requireAuth, (req, res) => {
+    const uid = String(req.session.user.id);
+    res.set({
+        'Content-Type':  'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection':    'keep-alive',
+        'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+    registerUserSSE(uid, res);
+    const ping = setInterval(() => { res.write(': ping\n\n'); }, 25000);
+    req.on('close', () => { clearInterval(ping); unregisterUserSSE(uid); });
+});
+
+router.get('/api/notificacoes/sociais/count', requireAuth, async (req, res) => {
+    try {
+        const [[{ total }]] = await db.execute(
+            'SELECT COUNT(*) AS total FROM notificacao_social WHERE usuario_id = ? AND lida = 0',
+            [req.session.user.id]
+        );
+        res.json({ total });
+    } catch (err) {
+        console.error('[/api/notificacoes/count]', err.message);
+        res.json({ total: 0 });
+    }
+});
+
+router.get('/api/notificacoes/sociais', requireAuth, async (req, res) => {
+    try {
+        const [notifs] = await db.execute(
+            `SELECT id, tipo, titulo, mensagem, lida, dados_extras, criado_em
+             FROM notificacao_social
+             WHERE usuario_id = ?
+             ORDER BY criado_em DESC LIMIT 30`,
+            [req.session.user.id]
+        );
+        res.json({ notificacoes: notifs });
+    } catch (err) {
+        console.error('[/api/notificacoes/sociais]', err.message);
+        res.json({ notificacoes: [] });
+    }
+});
+
+router.post('/api/notificacoes/sociais/ler/:id', requireAuth, async (req, res) => {
+    try {
+        await db.execute(
+            'UPDATE notificacao_social SET lida = 1 WHERE id = ? AND usuario_id = ?',
+            [parseInt(req.params.id, 10), req.session.user.id]
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[/api/notificacoes/ler]', err.message);
+        res.json({ ok: false });
+    }
+});
+
+router.post('/api/notificacoes/sociais/ler-todas', requireAuth, async (req, res) => {
+    try {
+        await db.execute(
+            'UPDATE notificacao_social SET lida = 1 WHERE usuario_id = ? AND lida = 0',
+            [req.session.user.id]
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[/api/notificacoes/ler-todas]', err.message);
+        res.json({ ok: false });
     }
 });
 
