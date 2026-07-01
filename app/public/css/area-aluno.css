@@ -14,6 +14,7 @@ body {
     background: #121212;
     color: #fff;
     overflow-x: hidden;
+    max-width: 100vw;
 }
 
 /* DASHBOARD LAYOUT */
@@ -21,7 +22,7 @@ body {
     display: flex;
     min-height: 100vh;
     gap: 1.5rem;
-    padding: calc(56px + 1rem) 1.5rem 1.5rem;
+    padding: calc(82px + 1rem) 1.5rem 1.5rem;
 }
 
 /* =========================
@@ -470,7 +471,9 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    height: 56px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 20px 16px;
     background: #C98B1D;
     z-index: 1001;
     display: flex;
@@ -485,8 +488,8 @@ body {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    padding: 0 16px;
-    height: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     position: relative;
 }
 .logo {
@@ -498,9 +501,6 @@ body {
     pointer-events: auto;
 }
 .logo a {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     text-decoration: none;
     color: #000;
 }
@@ -537,27 +537,43 @@ body {
 }
 
 @media (max-width: 768px) {
-    .menu-icon { display: flex; align-items: center; visibility: visible; pointer-events: auto; z-index: 1; }
-    /* Reverte logo para fluxo normal — botão ☰ restaura o balanço do flex */
+    /* Header — altura igual ao header público (padding: 20px) */
+    .gymbros-header { height: auto; padding: 20px 16px; }
+    .header-container { padding: 0; height: auto; }
+
+    /* Hamburguer */
+    .menu-icon { display: flex; align-items: center; visibility: visible; pointer-events: auto; z-index: 1; flex-shrink: 0; }
+
+    /* Logo centralizada */
     .logo {
-        position: static;
-        transform: none;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
     }
+
+    /* Ícones da direita — tamanho natural, sem encolher */
+    .lang-selector { display: none; }
+    .header-right { gap: 4px; }
+
+    /* Esconder toggle de tema no mobile */
+    .theme-toggle { display: none !important; }
+
+    /* Sidebar mobile — começa abaixo do header */
     .aluno-sidebar {
         position: fixed;
-        top: 0;
+        top: 82px;
         left: -100%;
         width: 80%;
         max-width: 300px;
-        height: 100vh;
-        max-height: 100vh;
+        height: calc(100vh - 82px);
+        max-height: calc(100vh - 82px);
         z-index: 9999;
         transition: left 0.3s ease;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         border-radius: 0 15px 15px 0;
         margin-bottom: 0;
-        padding-top: 56px;
+        padding-top: 1rem;
         padding-bottom: 48px;
     }
     .aluno-sidebar.open { left: 0; }
@@ -587,9 +603,10 @@ body {
         width: 100% !important;
         padding: 1.25rem 1rem;
     }
+    /* Compensar header de ~82px (padding: 20px + conteúdo) */
     .aluno-dashboard {
         flex-direction: column;
-        padding: 0;
+        padding: 82px 0 0;
     }
     .aluno-sidebar .aluno-profile .avatar img {
         width: 120px;
@@ -2107,8 +2124,10 @@ body.light-mode .plano-card-destaque .plano-card-btn i { color: #000; } /* hover
     display: flex;
     gap: 28px;
     max-width: 960px;
+    width: 100%;
+    box-sizing: border-box;
     margin: 0 auto;
-    padding: 0;
+    padding: 0 16px;
     align-items: flex-start;
     flex: 1;
 }
@@ -2116,6 +2135,8 @@ body.light-mode .plano-card-destaque .plano-card-btn i { color: #000; } /* hover
 .feed-col {
     flex: 1;
     min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
     max-width: 600px;
     border-left: 1px solid #222;
     border-right: 1px solid #222;
@@ -2387,6 +2408,140 @@ body.light-mode .plano-card-destaque .plano-card-btn i { color: #000; } /* hover
         border-right: none;
         min-height: auto;
     }
+}
+
+/* ── Sugestões mobile (estilo Instagram) ─────── */
+.feed-sugestoes-mobile {
+    display: none;
+    border-bottom: 1px solid var(--border, #222);
+    padding: 14px 0;
+    overflow: hidden;
+    width: 100%;
+}
+
+.feed-sugestoes-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    margin-bottom: 12px;
+}
+
+.feed-sugestoes-mobile-header span {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text, #f0f0f0);
+}
+
+.feed-sugestoes-ver-todos {
+    font-size: 0.75rem;
+    color: var(--gold, #C98B1D);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.feed-sugestoes-mobile-scroll {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0 16px 8px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+}
+
+.feed-sugestoes-mobile-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.feed-sugestao-mobile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 88px;
+    max-width: 88px;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.feed-sugestao-mobile-foto {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border, #333);
+    display: block;
+}
+
+.feed-sugestao-mobile-nome {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text, #f0f0f0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.feed-sugestao-mobile-username {
+    font-size: 0.65rem;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    margin-top: -4px;
+}
+
+.feed-sugestao-mobile-btn {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--gold, #C98B1D);
+    background: transparent;
+    color: var(--gold, #C98B1D);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.feed-sugestao-mobile-btn:hover,
+.feed-sugestao-mobile-btn.enviado {
+    background: var(--gold, #C98B1D);
+    color: #000;
+}
+
+.feed-sugestao-mobile-btn.enviado {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.feed-sugestao-mobile-skeleton {
+    min-width: 88px;
+    max-width: 88px;
+    height: 110px;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shine 1.4s infinite;
+    flex-shrink: 0;
+}
+
+@keyframes skeleton-shine {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@media (max-width: 768px) {
+    .feed-sugestoes-mobile { display: block; }
 }
 
 .feed-header {
