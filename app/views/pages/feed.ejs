@@ -10,8 +10,7 @@
 <link rel="stylesheet" href="/css/footer.css">
 <link rel="stylesheet" href="/css/area-aluno.css">
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
@@ -97,6 +96,19 @@
                 </section>
                 <section class="feed-compose-footer">
                     <button class="feed-compose-btn" disabled>Postar</button>
+                </section>
+
+                <!-- Sugestões mobile — só aparece em telas pequenas -->
+                <section class="feed-sugestoes-mobile" id="feed-sugestoes-mobile">
+                    <section class="feed-sugestoes-mobile-header">
+                        <span>Pessoas que você talvez conheça</span>
+                        <a href="/buscar" class="feed-sugestoes-ver-todos">Ver todos</a>
+                    </section>
+                    <section class="feed-sugestoes-mobile-scroll" id="feed-sugestoes-mobile-list">
+                        <section class="feed-sugestao-mobile-skeleton"></section>
+                        <section class="feed-sugestao-mobile-skeleton"></section>
+                        <section class="feed-sugestao-mobile-skeleton"></section>
+                    </section>
                 </section>
 
                 <section class="feed-empty">
@@ -305,6 +317,70 @@ document.getElementById('sugestoes-list').addEventListener('click', async e => {
 
 // Logout button (sem onclick inline)
 document.getElementById('feed-logout-btn')?.addEventListener('click', () => abrirModalLogout());
+
+// ── Sugestões mobile ──────────────────────────────────────────────────────────
+async function carregarSugestoesMobile() {
+    const lista = document.getElementById('feed-sugestoes-mobile-list');
+    if (!lista || window.innerWidth > 768) return;
+    try {
+        const r = await fetch('/api/feed/sugestoes');
+        const d = await r.json();
+        if (!d.sugestoes?.length) {
+            const secao = document.getElementById('feed-sugestoes-mobile');
+            if (secao) secao.style.display = 'none';
+            return;
+        }
+        lista.innerHTML = d.sugestoes.map(u => `
+            <section class="feed-sugestao-mobile-card">
+                <a href="/u/${u.username || u.id}">
+                    <img src="${u.foto_perfil || '/images/avatar.png'}"
+                        class="feed-sugestao-mobile-foto"
+                        alt="${u.nome}"
+                        loading="lazy">
+                </a>
+                <section class="feed-sugestao-mobile-nome">${u.nome}</section>
+                ${u.username ? `<section class="feed-sugestao-mobile-username">@${u.username}</section>` : ''}
+                <button class="feed-sugestao-mobile-btn" data-user-id="${u.id}">Seguir</button>
+            </section>
+        `).join('');
+    } catch (_) {
+        const secao = document.getElementById('feed-sugestoes-mobile');
+        if (secao) secao.style.display = 'none';
+    }
+}
+
+document.getElementById('feed-sugestoes-mobile-list')?.addEventListener('click', async e => {
+    const btn = e.target.closest('.feed-sugestao-mobile-btn');
+    if (!btn || btn.classList.contains('enviado')) return;
+    const userId = btn.dataset.userId;
+    try {
+        await fetch(`/api/amizades/solicitar/${userId}`, { method: 'POST' });
+    } catch (_) {}
+    btn.textContent = 'Enviado';
+    btn.classList.add('enviado');
+    btn.disabled = true;
+});
+
+carregarSugestoesMobile();
+
+// ── Fix scroll horizontal sugestões mobile ────────────────────────────────────
+(function () {
+    const scrollEl = document.getElementById('feed-sugestoes-mobile-list');
+    if (!scrollEl) return;
+    let startX = 0, startY = 0, scrollingX = false;
+    scrollEl.addEventListener('touchstart', function (e) {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        scrollingX = false;
+    }, { passive: true });
+    scrollEl.addEventListener('touchmove', function (e) {
+        const dx = Math.abs(e.touches[0].clientX - startX);
+        const dy = Math.abs(e.touches[0].clientY - startY);
+        if (!scrollingX && dy > dx) return;
+        scrollingX = true;
+        e.stopPropagation();
+    }, { passive: true });
+})();
 </script>
 
 </body>
