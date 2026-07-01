@@ -183,9 +183,13 @@ function avaliarTexto(data, contexto) {
   const profHeavy = profanity.filter(m => m.intensity === 'high' || m.intensity === 'medium');
   if (profHeavy.length > 0) return { decisao: 'rejeitado', motivo: 'profanity', matches: profHeavy };
 
-  // dados pessoais: legítimos em bio (telefone da academia)
-  if (personal.length > 0 && contexto !== 'bio')
-    return { decisao: 'rejeitado', motivo: 'personal_data', matches: personal };
+  // dados pessoais: legítimos em bio (telefone da academia);
+  // @menções são um recurso do produto em comentários, não vazamento de dado
+  const personalRelevante = contexto === 'comentario'
+    ? personal.filter(m => m.type !== 'username')
+    : personal;
+  if (personalRelevante.length > 0 && contexto !== 'bio')
+    return { decisao: 'rejeitado', motivo: 'personal_data', matches: personalRelevante };
 
   // Revisão
   if (violence.length > 0) return { decisao: 'revisao', motivo: 'violence', matches: violence };

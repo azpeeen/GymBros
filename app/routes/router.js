@@ -26,7 +26,9 @@ const { criarNotificacao } = require('../services/notificacoes');
 const cloudinary = require('../config/cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const requirePlanLevel = require('../middleware/requirePlanLevel');
-const { limiterLogin } = require('../middleware/rateLimits');
+const { limiterLogin, limiterUpload } = require('../middleware/rateLimits');
+const { uploadPost } = require('../middleware/uploadPost');
+const { moderarImagem, moderarVideo, moderarTexto } = require('../services/moderacao');
 
 function safeJson(str, fallback) {
     try { return JSON.parse(str || 'null') ?? fallback; }
@@ -570,6 +572,114 @@ function safeJson(str, fallback) {
     } catch (err) {
         if (err.errno !== 1050) console.error('[migration] notificacao_social:', err.message);
     }
+
+    // F5 — tabelas de posts (feed)
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS post (
+                id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id           INT UNSIGNED NOT NULL,
+                legenda           VARCHAR(2200) NULL,
+                tipo              ENUM('texto','foto','video','carrossel') NOT NULL DEFAULT 'texto',
+                status            ENUM('ativo','removido','em_revisao') NOT NULL DEFAULT 'ativo',
+                moderado          TINYINT(1) NOT NULL DEFAULT 0,
+                motivo_moderacao  VARCHAR(50) NULL,
+                visibilidade      ENUM('publico','amigos','privado') NOT NULL DEFAULT 'amigos',
+                total_reacoes     INT NOT NULL DEFAULT 0,
+                total_comentarios INT NOT NULL DEFAULT 0,
+                created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_post_user (user_id),
+                KEY idx_post_status (status),
+                KEY idx_post_created (created_at),
+                CONSTRAINT fk_post_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+            )
+        `);
+        console.log('[migration] post table OK');
+    } catch (err) {
+        if (err.errno !== 1050) console.error('[migration] post:', err.message);
+    }
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS post_midia (
+                id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                post_id    INT UNSIGNED NOT NULL,
+                url        VARCHAR(500) NOT NULL,
+                public_id  VARCHAR(200) NULL,
+                tipo       ENUM('foto','video') NOT NULL,
+                ordem      TINYINT NOT NULL DEFAULT 0,
+                largura    INT NULL,
+                altura     INT NULL,
+                PRIMARY KEY (id),
+                KEY idx_pm_post (post_id),
+                CONSTRAINT fk_pm_post FOREIGN KEY (post_id) REFERENCES post(id) ON DELETE CASCADE
+            )
+        `);
+        console.log('[migration] post_midia table OK');
+    } catch (err) {
+        if (err.errno !== 1050) console.error('[migration] post_midia:', err.message);
+    }
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS denuncia (
+                id           INT AUTO_INCREMENT PRIMARY KEY,
+                denunciante  INT UNSIGNED NOT NULL,
+                tipo_alvo    ENUM('post','comentario','usuario') NOT NULL DEFAULT 'post',
+                alvo_id      INT UNSIGNED NOT NULL,
+                motivo       ENUM('obsceno','spam','violencia','fake','outro') NOT NULL DEFAULT 'outro',
+                descricao    VARCHAR(500) NULL,
+                criado_em    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_denuncia_alvo (tipo_alvo, alvo_id),
+                KEY idx_denuncia_denunciante (denunciante)
+            )
+        `);
+        console.log('[migration] denuncia table OK');
+    } catch (err) {
+        if (err.errno !== 1050) console.error('[migration] denuncia:', err.message);
+    }
+
+    // F6 — tabelas de comentários e reações
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS comentario (
+                id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                post_id    INT UNSIGNED NOT NULL,
+                user_id    INT UNSIGNED NOT NULL,
+                parent_id  INT UNSIGNED NULL,
+                texto      VARCHAR(1000) NOT NULL,
+                mencoes    JSON NULL,
+                status     ENUM('ativo','removido') NOT NULL DEFAULT 'ativo',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_com_post (post_id),
+                KEY idx_com_user (user_id),
+                CONSTRAINT fk_com_post   FOREIGN KEY (post_id)   REFERENCES post(id) ON DELETE CASCADE,
+                CONSTRAINT fk_com_user   FOREIGN KEY (user_id)   REFERENCES user(id) ON DELETE CASCADE,
+                CONSTRAINT fk_com_parent FOREIGN KEY (parent_id) REFERENCES comentario(id) ON DELETE SET NULL
+            )
+        `);
+        console.log('[migration] comentario table OK');
+    } catch (err) {
+        if (err.errno !== 1050) console.error('[migration] comentario:', err.message);
+    }
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS reacao (
+                id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                post_id    INT UNSIGNED NOT NULL,
+                user_id    INT UNSIGNED NOT NULL,
+                tipo       ENUM('fogo','musculo','surpresa','parabens','forca') NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_reacao (post_id, user_id),
+                CONSTRAINT fk_reacao_post FOREIGN KEY (post_id) REFERENCES post(id) ON DELETE CASCADE,
+                CONSTRAINT fk_reacao_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+            )
+        `);
+        console.log('[migration] reacao table OK');
+    } catch (err) {
+        if (err.errno !== 1050) console.error('[migration] reacao:', err.message);
+    }
 })();
 
 // Soft delete cron — anonimiza contas com deletion_scheduled_at vencido (a cada 24h)
@@ -695,6 +805,66 @@ function requirePlano(req, res, next) {
     next();
 }
 
+// ── Feed de posts: amigos aceitos + próprio usuário ───────────────────────────
+async function buscarAmigosIds(userId) {
+    try {
+        const [rows] = await db.execute(
+            `SELECT IF(solicitante_id = ?, destinatario_id, solicitante_id) AS id
+             FROM friendship
+             WHERE (solicitante_id = ? OR destinatario_id = ?) AND status = 'aceito'`,
+            [userId, userId, userId]
+        );
+        return [userId, ...rows.map(r => r.id)];
+    } catch (err) {
+        return [userId];
+    }
+}
+
+async function buscarFeedPosts(userId, lastId) {
+    const limit      = 10;
+    const amigosIds  = await buscarAmigosIds(userId);
+    const placeholders = amigosIds.map(() => '?').join(',');
+    const cursorClause = lastId ? `AND p.id < ${Number(lastId)}` : '';
+
+    const [posts] = await db.execute(`
+        SELECT
+            p.id, p.legenda, p.tipo, p.visibilidade,
+            p.status, p.total_reacoes, p.total_comentarios, p.created_at,
+            u.id AS autor_id, u.nome AS autor_nome,
+            u.username AS autor_username,
+            u.profile_photo AS autor_foto
+        FROM post p
+        JOIN user u ON u.id = p.user_id
+        WHERE p.user_id IN (${placeholders})
+          AND p.status = 'ativo'
+          AND (p.user_id = ${Number(userId)} OR p.visibilidade != 'privado')
+          ${cursorClause}
+        ORDER BY p.id DESC
+        LIMIT ${limit}
+    `, amigosIds);
+
+    for (const post of posts) {
+        const [midias] = await db.execute(
+            'SELECT url, tipo, ordem, largura, altura FROM post_midia WHERE post_id = ? ORDER BY ordem',
+            [post.id]
+        );
+        post.midias = midias;
+        post.souAutor = post.autor_id === userId;
+
+        const [[minhaReacao]] = await db.execute(
+            'SELECT tipo FROM reacao WHERE post_id = ? AND user_id = ?',
+            [post.id, userId]
+        );
+        post.minhaReacao = minhaReacao ? minhaReacao.tipo : null;
+    }
+
+    return {
+        posts,
+        hasMore: posts.length === limit,
+        lastId:  posts.length > 0 ? posts[posts.length - 1].id : null,
+    };
+}
+
 // Função simples pra validar CPF (só pra demo)
 function validarCPF(cpf) {
   cpf = cpf.replace(/\D/g, '');
@@ -749,10 +919,11 @@ router.get('/feed', requireAuth, async (req, res) => {
             'SELECT id, nome, username, profile_photo FROM user WHERE id = ?',
             [userId]
         );
+        const feedData = await buscarFeedPosts(userId, null);
         res.render('pages/feed', {
             user:    { ...req.session.user, ...(userData || {}) },
-            posts:   [],
-            hasMore: false,
+            posts:   feedData.posts,
+            hasMore: feedData.hasMore,
             page:    'feed',
             seo: { title: 'Feed — GymBros', canonical: '/feed', robots: 'noindex, nofollow' },
         });
@@ -3955,10 +4126,20 @@ router.get('/api/perfil/check-username', requireAuth, async (req, res) => {
 router.get('/api/usuarios/buscar', requireAuth, async (req, res) => {
     const q = (req.query.q || '').trim();
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = 20;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 20);
     const offset = (page - 1) * limit;
+    const userId = req.session.user.id;
 
     if (!q) return res.json({ usuarios: [], total: 0 });
+
+    const naoBloqueado = `
+        AND NOT EXISTS (
+            SELECT 1 FROM friendship f
+            WHERE f.status = 'bloqueado'
+              AND ((f.solicitante_id = ? AND f.destinatario_id = user.id)
+                OR (f.solicitante_id = user.id AND f.destinatario_id = ?))
+        )
+    `;
 
     try {
         const like = `%${q}%`;
@@ -3969,13 +4150,14 @@ router.get('/api/usuarios/buscar', requireAuth, async (req, res) => {
               AND status = 'ativo'
               AND username IS NOT NULL
               AND id != ?
+              ${naoBloqueado}
             ORDER BY
                 CASE WHEN username = ? THEN 0
                      WHEN username LIKE ? THEN 1
                      ELSE 2 END,
                 nome ASC
             LIMIT ${limit} OFFSET ${offset}
-        `, [like, like, req.session.user.id, q, `${q}%`]);
+        `, [like, like, userId, userId, userId, q, `${q}%`]);
 
         const [[{ total }]] = await db.execute(`
             SELECT COUNT(*) AS total FROM user
@@ -3983,7 +4165,8 @@ router.get('/api/usuarios/buscar', requireAuth, async (req, res) => {
               AND status = 'ativo'
               AND username IS NOT NULL
               AND id != ?
-        `, [like, like, req.session.user.id]);
+              ${naoBloqueado}
+        `, [like, like, userId, userId, userId]);
 
         res.json({ usuarios, total, page, totalPaginas: Math.ceil(total / limit) });
     } catch (err) {
@@ -4294,6 +4477,385 @@ router.post('/api/notificacoes/sociais/ler-todas', requireAuth, async (req, res)
     } catch (err) {
         console.error('[/api/notificacoes/ler-todas]', err.message);
         res.json({ ok: false });
+    }
+});
+
+// ─── F5: Posts (feed) ───────────────────────────────────────────────────────
+
+router.post('/api/posts',
+    requireAuth,
+    limiterUpload,
+    uploadPost.array('midias', 10),
+    async (req, res) => {
+        const userId = req.session.user.id;
+        const legenda = (req.body.legenda || '').trim();
+        const visibilidade = ['publico', 'amigos', 'privado'].includes(req.body.visibilidade)
+            ? req.body.visibilidade : 'amigos';
+        const arquivos = req.files || [];
+
+        if (!legenda && arquivos.length === 0) {
+            return res.json({ ok: false, erro: 'Post precisa de legenda ou mídia.' });
+        }
+
+        try {
+            if (legenda) {
+                const modTexto = await moderarTexto(legenda, 'post');
+                if (modTexto.decisao === 'rejeitado') {
+                    return res.json({ ok: false, erro: 'Legenda contém conteúdo não permitido.' });
+                }
+            }
+
+            const tipoPost = arquivos.length === 0 ? 'texto'
+                : arquivos.length > 1 ? 'carrossel'
+                : arquivos[0].mimetype.startsWith('video') ? 'video'
+                : 'foto';
+
+            const midias = [];
+            for (let i = 0; i < arquivos.length; i++) {
+                const arquivo = arquivos[i];
+                const isVideo = arquivo.mimetype.startsWith('video');
+                const pasta   = isVideo ? 'gymbros/posts/videos' : 'gymbros/posts/fotos';
+
+                const resultado = await new Promise((resolve, reject) => {
+                    const stream = cloudinary.uploader.upload_stream(
+                        {
+                            folder: pasta,
+                            resource_type: isVideo ? 'video' : 'image',
+                            transformation: isVideo ? [] : [
+                                { width: 1080, height: 1080, crop: 'limit' },
+                                { quality: 'auto', fetch_format: 'auto' },
+                            ],
+                        },
+                        (err, result) => err ? reject(err) : resolve(result)
+                    );
+                    stream.end(arquivo.buffer);
+                });
+
+                const modMidia = isVideo
+                    ? await moderarVideo(resultado.secure_url)
+                    : await moderarImagem(resultado.secure_url);
+
+                if (modMidia.decisao === 'rejeitado') {
+                    await cloudinary.uploader.destroy(resultado.public_id,
+                        { resource_type: isVideo ? 'video' : 'image' });
+                    return res.json({ ok: false, erro: 'Uma ou mais mídias contêm conteúdo não permitido.' });
+                }
+
+                midias.push({
+                    url:       resultado.secure_url,
+                    public_id: resultado.public_id,
+                    tipo:      isVideo ? 'video' : 'foto',
+                    ordem:     i,
+                    largura:   resultado.width || null,
+                    altura:    resultado.height || null,
+                    revisao:   modMidia.decisao === 'revisao',
+                });
+            }
+
+            const statusPost = midias.some(m => m.revisao) ? 'em_revisao' : 'ativo';
+
+            const [result] = await db.execute(
+                `INSERT INTO post (user_id, legenda, tipo, status, visibilidade, moderado)
+                 VALUES (?, ?, ?, ?, ?, 1)`,
+                [userId, legenda || null, tipoPost, statusPost, visibilidade]
+            );
+            const postId = result.insertId;
+
+            for (const m of midias) {
+                await db.execute(
+                    `INSERT INTO post_midia (post_id, url, public_id, tipo, ordem, largura, altura)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [postId, m.url, m.public_id, m.tipo, m.ordem, m.largura, m.altura]
+                );
+            }
+
+            res.json({
+                ok: true,
+                postId,
+                status: statusPost,
+                mensagem: statusPost === 'em_revisao'
+                    ? 'Post enviado para revisão e será publicado em breve.'
+                    : 'Post publicado com sucesso!',
+            });
+        } catch (err) {
+            console.error('[POST /api/posts]', err.message);
+            res.json({ ok: false, erro: 'Erro ao publicar post.' });
+        }
+    }
+);
+
+router.get('/api/posts/feed', requireAuth, async (req, res) => {
+    try {
+        const lastId = parseInt(req.query.last_id, 10) || null;
+        const feedData = await buscarFeedPosts(req.session.user.id, lastId);
+        res.json(feedData);
+    } catch (err) {
+        console.error('[GET /api/posts/feed]', err.message);
+        res.json({ posts: [], hasMore: false });
+    }
+});
+
+router.delete('/api/posts/:id', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    const postId = parseInt(req.params.id, 10);
+    try {
+        const [[post]] = await db.execute(
+            'SELECT id FROM post WHERE id = ? AND user_id = ?',
+            [postId, userId]
+        );
+        if (!post) return res.json({ ok: false, erro: 'Post não encontrado.' });
+
+        const [midias] = await db.execute(
+            'SELECT public_id, tipo FROM post_midia WHERE post_id = ?', [postId]
+        );
+        for (const m of midias) {
+            if (!m.public_id) continue;
+            try {
+                await cloudinary.uploader.destroy(m.public_id,
+                    { resource_type: m.tipo === 'video' ? 'video' : 'image' });
+            } catch (_) {}
+        }
+
+        await db.execute('DELETE FROM post WHERE id = ?', [postId]);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[DELETE /api/posts/:id]', err.message);
+        res.json({ ok: false, erro: 'Erro ao remover post.' });
+    }
+});
+
+router.post('/api/posts/:id/denunciar', requireAuth, async (req, res) => {
+    const motivosValidos = ['obsceno', 'spam', 'violencia', 'fake', 'outro'];
+    const motivo = motivosValidos.includes(req.body.motivo) ? req.body.motivo : 'outro';
+    try {
+        await db.execute(
+            `INSERT INTO denuncia (denunciante, tipo_alvo, alvo_id, motivo, descricao)
+             VALUES (?, 'post', ?, ?, ?)`,
+            [req.session.user.id, parseInt(req.params.id, 10), motivo,
+             (req.body.descricao || '').slice(0, 500) || null]
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[POST /api/posts/:id/denunciar]', err.message);
+        res.json({ ok: false, erro: 'Erro ao denunciar.' });
+    }
+});
+
+// ─── F6: Comentários + Reações ─────────────────────────────────────────────
+
+router.get('/api/posts/:id/comentarios', requireAuth, async (req, res) => {
+    try {
+        const postId = parseInt(req.params.id, 10);
+        const [comentarios] = await db.execute(
+            `SELECT c.id, c.texto, c.mencoes, c.parent_id, c.created_at,
+                    u.id AS autor_id, u.nome AS autor_nome,
+                    u.username AS autor_username, u.profile_photo AS autor_foto
+             FROM comentario c
+             JOIN user u ON u.id = c.user_id
+             WHERE c.post_id = ? AND c.status = 'ativo'
+             ORDER BY c.created_at ASC
+             LIMIT 50`,
+            [postId]
+        );
+        res.json({ comentarios });
+    } catch (err) {
+        console.error('[GET /api/posts/:id/comentarios]', err.message);
+        res.json({ comentarios: [] });
+    }
+});
+
+router.post('/api/posts/:id/comentarios', requireAuth, async (req, res) => {
+    const userId   = req.session.user.id;
+    const postId   = parseInt(req.params.id, 10);
+    const texto    = (req.body.texto || '').trim();
+    const parentId = req.body.parent_id ? parseInt(req.body.parent_id, 10) : null;
+
+    if (!texto || texto.length > 1000) {
+        return res.json({ ok: false, erro: 'Comentário deve ter entre 1 e 1000 caracteres.' });
+    }
+
+    try {
+        const modTexto = await moderarTexto(texto, 'comentario');
+        if (modTexto.decisao === 'rejeitado') {
+            return res.json({ ok: false, erro: 'Comentário contém conteúdo não permitido.' });
+        }
+
+        const usernames = [...texto.matchAll(/@([a-z0-9_]+)/gi)].map(m => m[1].toLowerCase());
+        let mencionados = [];
+        if (usernames.length) {
+            const placeholders = usernames.map(() => '?').join(',');
+            const [rows] = await db.execute(
+                `SELECT id, username FROM user WHERE username IN (${placeholders}) AND status = 'ativo'`,
+                usernames
+            );
+            mencionados = rows;
+        }
+
+        const [result] = await db.execute(
+            `INSERT INTO comentario (post_id, user_id, parent_id, texto, mencoes)
+             VALUES (?, ?, ?, ?, ?)`,
+            [postId, userId, parentId, texto, mencionados.length ? JSON.stringify(mencionados.map(m => m.id)) : null]
+        );
+        const comentarioId = result.insertId;
+
+        await db.execute('UPDATE post SET total_comentarios = total_comentarios + 1 WHERE id = ?', [postId]);
+
+        const [[post]] = await db.execute('SELECT user_id FROM post WHERE id = ?', [postId]);
+        if (post && post.user_id !== userId) {
+            await criarNotificacao(
+                post.user_id,
+                'comentario',
+                'Novo comentário',
+                `${req.session.user.nome} comentou no seu post`,
+                { post_id: postId, comentario_id: comentarioId, autor_id: userId, autor_nome: req.session.user.nome }
+            );
+        }
+
+        for (const mencionado of mencionados) {
+            if (mencionado.id === userId) continue;
+            await criarNotificacao(
+                mencionado.id,
+                'mencao',
+                'Você foi mencionado',
+                `${req.session.user.nome} mencionou você em um comentário`,
+                { post_id: postId, comentario_id: comentarioId, autor_id: userId, autor_nome: req.session.user.nome }
+            );
+        }
+
+        res.json({
+            ok: true,
+            comentario: {
+                id: comentarioId,
+                texto,
+                parent_id: parentId,
+                created_at: new Date(),
+                autor_id: userId,
+                autor_nome: req.session.user.nome,
+                autor_username: req.session.user.username || null,
+                autor_foto: req.session.user.profile_photo || null,
+            },
+        });
+    } catch (err) {
+        console.error('[POST /api/posts/:id/comentarios]', err.message);
+        res.json({ ok: false, erro: 'Erro ao comentar.' });
+    }
+});
+
+router.delete('/api/comentarios/:id', requireAuth, async (req, res) => {
+    const userId       = req.session.user.id;
+    const comentarioId = parseInt(req.params.id, 10);
+    try {
+        const [[comentario]] = await db.execute(
+            'SELECT id, post_id FROM comentario WHERE id = ? AND user_id = ? AND status = "ativo"',
+            [comentarioId, userId]
+        );
+        if (!comentario) return res.json({ ok: false, erro: 'Comentário não encontrado.' });
+
+        await db.execute('UPDATE comentario SET status = "removido" WHERE id = ?', [comentarioId]);
+        await db.execute(
+            'UPDATE post SET total_comentarios = GREATEST(total_comentarios - 1, 0) WHERE id = ?',
+            [comentario.post_id]
+        );
+
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[DELETE /api/comentarios/:id]', err.message);
+        res.json({ ok: false, erro: 'Erro ao remover comentário.' });
+    }
+});
+
+router.post('/api/posts/:id/reagir', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    const postId = parseInt(req.params.id, 10);
+    const tiposValidos = ['fogo', 'musculo', 'surpresa', 'parabens', 'forca'];
+    const tipo = req.body.tipo;
+
+    if (!tiposValidos.includes(tipo)) {
+        return res.json({ ok: false, erro: 'Tipo de reação inválido.' });
+    }
+
+    try {
+        const [[post]] = await db.execute(
+            'SELECT id, user_id FROM post WHERE id = ? AND status = "ativo"',
+            [postId]
+        );
+        if (!post) return res.json({ ok: false, erro: 'Post não encontrado.' });
+
+        const [existente] = await db.execute(
+            'SELECT tipo FROM reacao WHERE post_id = ? AND user_id = ?',
+            [postId, userId]
+        );
+
+        await db.execute(
+            `INSERT INTO reacao (post_id, user_id, tipo) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE tipo = VALUES(tipo)`,
+            [postId, userId, tipo]
+        );
+
+        if (!existente.length) {
+            await db.execute('UPDATE post SET total_reacoes = total_reacoes + 1 WHERE id = ?', [postId]);
+            if (post.user_id !== userId) {
+                await criarNotificacao(
+                    post.user_id,
+                    'reacao',
+                    'Nova reação',
+                    `${req.session.user.nome} reagiu ao seu post`,
+                    { post_id: postId, tipo, autor_id: userId, autor_nome: req.session.user.nome }
+                );
+            }
+        }
+
+        const [[{ total }]] = await db.execute('SELECT total_reacoes AS total FROM post WHERE id = ?', [postId]);
+        res.json({ ok: true, tipo, total_reacoes: total });
+    } catch (err) {
+        console.error('[POST /api/posts/:id/reagir]', err.message);
+        res.json({ ok: false, erro: 'Erro ao reagir.' });
+    }
+});
+
+router.delete('/api/posts/:id/reagir', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    const postId = parseInt(req.params.id, 10);
+    try {
+        const [result] = await db.execute(
+            'DELETE FROM reacao WHERE post_id = ? AND user_id = ?',
+            [postId, userId]
+        );
+        if (result.affectedRows) {
+            await db.execute(
+                'UPDATE post SET total_reacoes = GREATEST(total_reacoes - 1, 0) WHERE id = ?',
+                [postId]
+            );
+        }
+        const [[{ total }]] = await db.execute('SELECT total_reacoes AS total FROM post WHERE id = ?', [postId]);
+        res.json({ ok: true, total_reacoes: total });
+    } catch (err) {
+        console.error('[DELETE /api/posts/:id/reagir]', err.message);
+        res.json({ ok: false, erro: 'Erro ao remover reação.' });
+    }
+});
+
+router.get('/api/posts/:id/reacoes', requireAuth, async (req, res) => {
+    const userId = req.session.user.id;
+    const postId = parseInt(req.params.id, 10);
+    try {
+        const [rows] = await db.execute(
+            'SELECT tipo, COUNT(*) AS total FROM reacao WHERE post_id = ? GROUP BY tipo',
+            [postId]
+        );
+        const contagemPorTipo = {};
+        let total = 0;
+        for (const r of rows) { contagemPorTipo[r.tipo] = r.total; total += r.total; }
+
+        const [[minha]] = await db.execute(
+            'SELECT tipo FROM reacao WHERE post_id = ? AND user_id = ?',
+            [postId, userId]
+        );
+
+        res.json({ total, minha_reacao: minha ? minha.tipo : null, contagem_por_tipo: contagemPorTipo });
+    } catch (err) {
+        console.error('[GET /api/posts/:id/reacoes]', err.message);
+        res.json({ total: 0, minha_reacao: null, contagem_por_tipo: {} });
     }
 });
 
