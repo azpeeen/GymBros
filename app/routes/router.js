@@ -680,6 +680,28 @@ function safeJson(str, fallback) {
     } catch (err) {
         if (err.errno !== 1050) console.error('[migration] reacao:', err.message);
     }
+
+    // F7 — tabela de eventos do feed (check-in, treino, conquista)
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS feed_event (
+                id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id    INT UNSIGNED NOT NULL,
+                tipo       ENUM('checkin','treino','conquista') NOT NULL,
+                ref_id     INT UNSIGNED NULL,
+                ref_tipo   VARCHAR(30) NULL,
+                payload    JSON NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_fe_user (user_id),
+                KEY idx_fe_created (created_at),
+                CONSTRAINT fk_fe_user FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+            )
+        `);
+        console.log('[migration] feed_event table OK');
+    } catch (err) {
+        if (err.errno !== 1050) console.error('[migration] feed_event:', err.message);
+    }
 })();
 
 // Soft delete cron — anonimiza contas com deletion_scheduled_at vencido (a cada 24h)
@@ -820,25 +842,28 @@ async function buscarAmigosIds(userId) {
     }
 }
 
-async function buscarFeedPosts(userId, lastId) {
+async function buscarFeedPosts(userId, lastId, lastEventId) {
     const limit      = 10;
     const amigosIds  = await buscarAmigosIds(userId);
     const placeholders = amigosIds.map(() => '?').join(',');
-    const cursorClause = lastId ? `AND p.id < ${Number(lastId)}` : '';
+    const postCursor  = lastId      ? `AND p.id < ${Number(lastId)}`       : '';
+    const eventCursor = lastEventId ? `AND fe.id < ${Number(lastEventId)}` : '';
 
     const [posts] = await db.execute(`
         SELECT
+            'post' AS _tipo,
             p.id, p.legenda, p.tipo, p.visibilidade,
             p.status, p.total_reacoes, p.total_comentarios, p.created_at,
             u.id AS autor_id, u.nome AS autor_nome,
             u.username AS autor_username,
-            u.profile_photo AS autor_foto
+            u.profile_photo AS autor_foto,
+            NULL AS evento_tipo, NULL AS evento_payload
         FROM post p
         JOIN user u ON u.id = p.user_id
         WHERE p.user_id IN (${placeholders})
           AND p.status = 'ativo'
           AND (p.user_id = ${Number(userId)} OR p.visibilidade != 'privado')
-          ${cursorClause}
+          ${postCursor}
         ORDER BY p.id DESC
         LIMIT ${limit}
     `, amigosIds);
@@ -858,10 +883,43 @@ async function buscarFeedPosts(userId, lastId) {
         post.minhaReacao = minhaReacao ? minhaReacao.tipo : null;
     }
 
+    const [eventos] = await db.execute(`
+        SELECT
+            'evento' AS _tipo,
+            fe.id, NULL AS legenda, NULL AS tipo, NULL AS visibilidade,
+            NULL AS status, 0 AS total_reacoes, 0 AS total_comentarios, fe.created_at,
+            u.id AS autor_id, u.nome AS autor_nome,
+            u.username AS autor_username,
+            u.profile_photo AS autor_foto,
+            fe.tipo AS evento_tipo, fe.payload AS evento_payload
+        FROM feed_event fe
+        JOIN user u ON u.id = fe.user_id
+        WHERE fe.user_id IN (${placeholders})
+          ${eventCursor}
+        ORDER BY fe.id DESC
+        LIMIT ${limit}
+    `, amigosIds);
+    for (const ev of eventos) { ev.souAutor = ev.autor_id === userId; ev.midias = []; }
+
+    const items = [...posts, ...eventos]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, limit);
+
+    const postsIncluidos    = items.filter(i => i._tipo === 'post');
+    const eventosIncluidos  = items.filter(i => i._tipo === 'evento');
+
+    const novoLastId = postsIncluidos.length
+        ? postsIncluidos[postsIncluidos.length - 1].id
+        : (lastId ?? null);
+    const novoLastEventId = eventosIncluidos.length
+        ? eventosIncluidos[eventosIncluidos.length - 1].id
+        : (lastEventId ?? null);
+
     return {
-        posts,
-        hasMore: posts.length === limit,
-        lastId:  posts.length > 0 ? posts[posts.length - 1].id : null,
+        items,
+        hasMore: posts.length === limit || eventos.length === limit,
+        lastId: novoLastId,
+        lastEventId: novoLastEventId,
     };
 }
 
@@ -919,21 +977,25 @@ router.get('/feed', requireAuth, async (req, res) => {
             'SELECT id, nome, username, profile_photo FROM user WHERE id = ?',
             [userId]
         );
-        const feedData = await buscarFeedPosts(userId, null);
+        const feedData = await buscarFeedPosts(userId, null, null);
         res.render('pages/feed', {
-            user:    { ...req.session.user, ...(userData || {}) },
-            posts:   feedData.posts,
-            hasMore: feedData.hasMore,
-            page:    'feed',
+            user:        { ...req.session.user, ...(userData || {}) },
+            items:       feedData.items,
+            hasMore:     feedData.hasMore,
+            lastId:      feedData.lastId,
+            lastEventId: feedData.lastEventId,
+            page:        'feed',
             seo: { title: 'Feed — GymBros', canonical: '/feed', robots: 'noindex, nofollow' },
         });
     } catch (err) {
         console.error('[feed]', err.message);
         res.render('pages/feed', {
-            user:    req.session.user,
-            posts:   [],
-            hasMore: false,
-            page:    'feed',
+            user:        req.session.user,
+            items:       [],
+            hasMore:     false,
+            lastId:      null,
+            lastEventId: null,
+            page:        'feed',
             seo: { title: 'Feed — GymBros', canonical: '/feed', robots: 'noindex, nofollow' },
         });
     }
@@ -1527,8 +1589,24 @@ router.post('/treinos/checkin', requireAuth, async (req, res) => {
             'SELECT created_at FROM treino_checkins WHERE id = ?',
             [result.insertId]
         );
-        const novasConquistas = await conquistas.verificarConsistencia(userId).catch(() => []);
-        return res.json({ ok: true, created_at: rows[0].created_at, novasConquistas });
+
+        const novasSlugs = await conquistas.verificarConsistencia(userId).catch(() => []);
+        let novasConquistas = [];
+        if (novasSlugs.length) {
+            const placeholders = novasSlugs.map(() => '?').join(',');
+            const [detalhes] = await db.execute(
+                `SELECT slug, nome, tier, icone FROM conquistas WHERE slug IN (${placeholders})`,
+                novasSlugs
+            );
+            novasConquistas = detalhes;
+        }
+
+        return res.json({
+            ok: true,
+            checkinId: result.insertId,
+            created_at: rows[0].created_at,
+            novasConquistas,
+        });
     } catch (err) {
         console.error('[checkin]', err.message);
         return res.status(500).json({ ok: false, erro: 'Erro ao registrar check-in.' });
@@ -4586,12 +4664,70 @@ router.post('/api/posts',
 
 router.get('/api/posts/feed', requireAuth, async (req, res) => {
     try {
-        const lastId = parseInt(req.query.last_id, 10) || null;
-        const feedData = await buscarFeedPosts(req.session.user.id, lastId);
+        const lastId      = parseInt(req.query.last_id, 10) || null;
+        const lastEventId = parseInt(req.query.last_event_id, 10) || null;
+        const feedData = await buscarFeedPosts(req.session.user.id, lastId, lastEventId);
         res.json(feedData);
     } catch (err) {
         console.error('[GET /api/posts/feed]', err.message);
-        res.json({ posts: [], hasMore: false });
+        res.json({ items: [], hasMore: false });
+    }
+});
+
+router.get('/api/posts/feed/novos', requireAuth, async (req, res) => {
+    const userId       = req.session.user.id;
+    const sincePostId  = parseInt(req.query.since_post_id, 10) || 0;
+    const sinceEventId = parseInt(req.query.since_event_id, 10) || 0;
+
+    try {
+        const amigosIds = await buscarAmigosIds(userId);
+        const placeholders = amigosIds.map(() => '?').join(',');
+
+        const [[{ totalPosts }]] = await db.execute(`
+            SELECT COUNT(*) AS totalPosts FROM post p
+            WHERE p.user_id IN (${placeholders})
+              AND p.status = 'ativo'
+              AND (p.user_id = ${Number(userId)} OR p.visibilidade != 'privado')
+              AND p.id > ${sincePostId}
+        `, amigosIds);
+
+        const [[{ totalEventos }]] = await db.execute(`
+            SELECT COUNT(*) AS totalEventos FROM feed_event fe
+            WHERE fe.user_id IN (${placeholders})
+              AND fe.id > ${sinceEventId}
+        `, amigosIds);
+
+        res.json({ total: totalPosts + totalEventos });
+    } catch (err) {
+        console.error('[GET /api/posts/feed/novos]', err.message);
+        res.json({ total: 0 });
+    }
+});
+
+router.post('/api/feed/evento', requireAuth, async (req, res) => {
+    const { tipo, ref_id, ref_tipo, payload } = req.body;
+    const tiposValidos = ['checkin', 'treino', 'conquista'];
+
+    if (!tiposValidos.includes(tipo)) {
+        return res.json({ ok: false, erro: 'Tipo inválido.' });
+    }
+
+    try {
+        const [result] = await db.execute(
+            `INSERT INTO feed_event (user_id, tipo, ref_id, ref_tipo, payload)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+                req.session.user.id,
+                tipo,
+                parseInt(ref_id, 10) || null,
+                ref_tipo ? String(ref_tipo).slice(0, 30) : null,
+                payload ? JSON.stringify(payload) : null,
+            ]
+        );
+        res.json({ ok: true, eventId: result.insertId });
+    } catch (err) {
+        console.error('[POST /api/feed/evento]', err.message);
+        res.json({ ok: false, erro: 'Erro ao compartilhar.' });
     }
 });
 
