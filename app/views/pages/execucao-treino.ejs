@@ -7,6 +7,7 @@
 <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
 <link rel="stylesheet" href="/css/execucao-treino.css">
 <link rel="stylesheet" href="/css/conquistas.css">
+<link rel="stylesheet" href="/css/compartilhar-feed.css">
 </head>
 <body class="exec-page">
 
@@ -148,6 +149,7 @@
 <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 <script src="/js/conquistas.js"></script>
+<script src="/js/compartilhar-feed.js"></script>
 <script>
 // ── Dados do servidor ─────────────────────────────────────
 const PLANO           = <%- JSON.stringify(plano) %>;
@@ -523,6 +525,22 @@ document.getElementById('btnFim').addEventListener('click', async () => {
                     await mostrarAnimacaoConquista(c);
                     await sleep(300);
                 }
+                if (window.abrirModalCompartilhar) {
+                    const top = ordenadas[ordenadas.length - 1];
+                    await window.abrirModalCompartilhar({
+                        tipo: 'conquista',
+                        ref_tipo: 'conquista',
+                        payload: { conquista_nome: top.nome, conquista_icone: top.icone },
+                    });
+                }
+            }
+            if (window.abrirModalCompartilhar) {
+                await window.abrirModalCompartilhar({
+                    tipo: 'treino',
+                    ref_id: sessaoId,
+                    ref_tipo: 'treino_sessao',
+                    payload: { treino_nome: PLANO.nome, total_exercicios: TOTAL },
+                });
             }
         } catch (e) { console.error('[conquista exibir]', e); }
     }

@@ -85,6 +85,8 @@
                     <h1>Feed</h1>
                 </section>
 
+                <section id="feed-novos-banner" class="feed-novos-banner" style="display:none"></section>
+
                 <section class="feed-compose">
                     <img class="feed-compose-avatar"
                         src="<%= user.profile_photo || '/images/avatar.png' %>"
@@ -121,12 +123,16 @@
                 </section>
 
                 <section class="feed-posts" id="feed-posts">
-                    <% posts.forEach(function(post) { %>
-                        <%- include('../partials/post-card', { post, user }) %>
+                    <% items.forEach(function(item) { %>
+                        <% if (item._tipo === 'evento') { %>
+                            <%- include('../partials/evento-card', { item }) %>
+                        <% } else { %>
+                            <%- include('../partials/post-card', { post: item, user }) %>
+                        <% } %>
                     <% }); %>
                 </section>
 
-                <section class="feed-empty" id="feed-empty" style="<%= posts.length ? 'display:none' : '' %>">
+                <section class="feed-empty" id="feed-empty" style="<%= items.length ? 'display:none' : '' %>">
                     <i class="fas fa-users"></i>
                     <h3>Seu feed está vazio</h3>
                     <p>Adicione amigos para ver treinos, conquistas e check-ins</p>
@@ -194,9 +200,12 @@
 
 <script>
 window.__FEED_STATE__ = {
-    hasMore:   <%- JSON.stringify(hasMore) %>,
-    lastId:    <%- JSON.stringify(posts.length ? posts[posts.length - 1].id : null) %>,
-    minhaFoto: <%- JSON.stringify(user.profile_photo || '/images/avatar.png') %>,
+    hasMore:          <%- JSON.stringify(hasMore) %>,
+    lastId:           <%- JSON.stringify(lastId) %>,
+    lastEventId:      <%- JSON.stringify(lastEventId) %>,
+    primeiroPostId:   <%- JSON.stringify((items.find(i => i._tipo === 'post')   || {}).id || null) %>,
+    primeiroEventId:  <%- JSON.stringify((items.find(i => i._tipo === 'evento') || {}).id || null) %>,
+    minhaFoto:        <%- JSON.stringify(user.profile_photo || '/images/avatar.png') %>,
 };
 </script>
 
@@ -530,6 +539,46 @@ carregarSugestoesMobile();
         </section>`;
     }
 
+    const EVENTO_ICONE = { checkin: '📍', treino: '💪', conquista: '🏆' };
+
+    function renderEventCard(item) {
+        const payload = item.evento_payload
+            ? (typeof item.evento_payload === 'string' ? JSON.parse(item.evento_payload) : item.evento_payload)
+            : {};
+        const nome     = escapeHtml(item.autor_nome || '');
+        const username = item.autor_username ? escapeHtml(item.autor_username) : '';
+        const perfil   = '/u/' + encodeURIComponent(item.autor_username || item.autor_id);
+        const foto     = escapeHtml(item.autor_foto || '/images/avatar.png');
+
+        const descricoes = {
+            checkin:   `Fez check-in${payload.gym_nome ? ' em ' + escapeHtml(payload.gym_nome) : ''}`,
+            treino:    `Concluiu um treino${payload.treino_nome ? ' · ' + escapeHtml(payload.treino_nome) : ''}${payload.total_exercicios ? ' · ' + payload.total_exercicios + ' exercícios' : ''}`,
+            conquista: `Desbloqueou ${payload.conquista_icone || '🏆'} ${escapeHtml(payload.conquista_nome || 'uma conquista')}`,
+        };
+
+        return `
+        <section class="post-card evento-card" data-id="${item.id}" data-tipo="evento">
+            <section class="post-header">
+                <a href="${perfil}"><img class="post-avatar" src="${foto}" alt="${nome}"></a>
+                <section class="post-header-info">
+                    <a href="${perfil}" class="post-author-name">${nome}</a>
+                    <section class="post-header-sub">
+                        ${username ? `<span class="post-author-username">@${username}</span><span class="post-dot-sep">·</span>` : ''}
+                        <span class="post-time" data-time="${item.created_at}">${formatarTempoPost(item.created_at)}</span>
+                    </section>
+                </section>
+            </section>
+            <section class="evento-body">
+                <span class="evento-icone">${EVENTO_ICONE[item.evento_tipo] || '📌'}</span>
+                <span class="evento-descricao">${descricoes[item.evento_tipo] || 'Teve uma atividade'}</span>
+            </section>
+        </section>`;
+    }
+
+    function renderItem(item) {
+        return item._tipo === 'evento' ? renderEventCard(item) : renderPostCard(item);
+    }
+
     atualizarTemposPosts();
     setInterval(atualizarTemposPosts, 60000);
 
@@ -624,7 +673,7 @@ carregarSugestoesMobile();
             if (data.status === 'ativo') {
                 try {
                     const feedResp = await fetch('/api/posts/feed').then(r => r.json());
-                    const novo = feedResp.posts.find(p => p.id === data.postId);
+                    const novo = feedResp.items.find(i => i._tipo === 'post' && i.id === data.postId);
                     if (novo) {
                         postsWrap.insertAdjacentHTML('afterbegin', renderPostCard(novo));
                         atualizarTemposPosts();
@@ -641,7 +690,7 @@ carregarSugestoesMobile();
     });
 
     // ── Scroll infinito ─────────────────────────────────────────────────────
-    const feedState = window.__FEED_STATE__ || { hasMore: false, lastId: null };
+    const feedState = window.__FEED_STATE__ || { hasMore: false, lastId: null, lastEventId: null };
     let carregandoMais = false;
     const sentinel  = document.getElementById('feed-scroll-sentinel');
     const loadingEl = document.getElementById('feed-loading-more');
@@ -651,13 +700,16 @@ carregarSugestoesMobile();
         carregandoMais = true;
         loadingEl.style.display = 'block';
         try {
-            const data = await fetch(`/api/posts/feed?last_id=${feedState.lastId}`).then(r => r.json());
-            data.posts.forEach(post => {
-                postsWrap.insertAdjacentHTML('beforeend', renderPostCard(post));
+            const data = await fetch(
+                `/api/posts/feed?last_id=${feedState.lastId ?? ''}&last_event_id=${feedState.lastEventId ?? ''}`
+            ).then(r => r.json());
+            data.items.forEach(item => {
+                postsWrap.insertAdjacentHTML('beforeend', renderItem(item));
             });
             atualizarTemposPosts();
-            feedState.hasMore = data.hasMore;
-            feedState.lastId  = data.lastId;
+            feedState.hasMore     = data.hasMore;
+            feedState.lastId      = data.lastId;
+            feedState.lastEventId = data.lastEventId;
         } catch (_) {
         } finally {
             carregandoMais = false;
@@ -670,6 +722,39 @@ carregarSugestoesMobile();
         if (entries[0].isIntersecting) carregarMaisPosts();
     });
     if (sentinel) observer.observe(sentinel);
+
+    // ── Polling de novos itens ────────────────────────────────────────────────
+    const novosBanner = document.getElementById('feed-novos-banner');
+
+    async function verificarNovos() {
+        try {
+            const data = await fetch(
+                `/api/posts/feed/novos?since_post_id=${feedState.primeiroPostId ?? 0}&since_event_id=${feedState.primeiroEventId ?? 0}`
+            ).then(r => r.json());
+            if (data.total > 0 && novosBanner) {
+                novosBanner.textContent = `${data.total} novo${data.total > 1 ? 's' : ''} — ver`;
+                novosBanner.style.display = 'block';
+            }
+        } catch (_) {}
+    }
+
+    novosBanner?.addEventListener('click', async () => {
+        try {
+            const data = await fetch('/api/posts/feed').then(r => r.json());
+            postsWrap.innerHTML = data.items.map(renderItem).join('');
+            atualizarTemposPosts();
+            feedState.hasMore      = data.hasMore;
+            feedState.lastId       = data.lastId;
+            feedState.lastEventId  = data.lastEventId;
+            feedState.primeiroPostId  = data.items.find(i => i._tipo === 'post')?.id ?? feedState.primeiroPostId;
+            feedState.primeiroEventId = data.items.find(i => i._tipo === 'evento')?.id ?? feedState.primeiroEventId;
+            if (emptyState) emptyState.style.display = data.items.length ? 'none' : '';
+            novosBanner.style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (_) {}
+    });
+
+    setInterval(verificarNovos, 30000);
 
     // ── Menu do post (remover / denunciar) ──────────────────────────────────
     document.addEventListener('click', async e => {

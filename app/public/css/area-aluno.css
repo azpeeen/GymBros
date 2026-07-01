@@ -3075,6 +3075,42 @@ video.post-midia-item { cursor: default; }
 }
 .mencao-opcao-username { font-size: 0.75rem; color: #666; }
 
+/* ── Card de evento (F7) ──────────────────────── */
+.evento-card {
+    background: rgba(201,139,29,0.04);
+    border-left: 2px solid rgba(201,139,29,0.4);
+}
+
+.evento-body {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0 4px;
+    font-size: 0.9rem;
+    color: #f0f0f0;
+}
+
+.evento-icone {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.evento-descricao { line-height: 1.4; }
+
+/* ── Banner de novos posts (F7) ───────────────── */
+.feed-novos-banner {
+    text-align: center;
+    padding: 10px;
+    background: #C98B1D;
+    color: #000;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 10px;
+    margin: 0 0 4px;
+}
+.feed-novos-banner:hover { opacity: 0.92; }
+
 /* ── Lightbox de imagem do post ─────────────── */
 .lightbox {
     position: fixed;

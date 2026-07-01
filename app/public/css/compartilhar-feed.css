@@ -1,0 +1,68 @@
+.compartilhar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.compartilhar-box {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 320px;
+    width: 90%;
+    text-align: center;
+}
+
+.compartilhar-icone {
+    font-size: 2rem;
+    margin-bottom: 8px;
+}
+
+.compartilhar-titulo {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #f0f0f0;
+    margin: 0 0 6px;
+}
+
+.compartilhar-texto {
+    font-size: 0.85rem;
+    color: #888;
+    margin: 0 0 20px;
+    line-height: 1.4;
+}
+
+.compartilhar-botoes {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.compartilhar-btn-nao,
+.compartilhar-btn-sim {
+    padding: 9px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.875rem;
+}
+
+.compartilhar-btn-nao {
+    border: 1px solid #333;
+    background: transparent;
+    color: #888;
+}
+.compartilhar-btn-nao:hover { border-color: #555; color: #f0f0f0; }
+
+.compartilhar-btn-sim {
+    border: none;
+    background: #C98B1D;
+    color: #000;
+    font-weight: 700;
+}
+.compartilhar-btn-sim:hover { opacity: 0.9; }

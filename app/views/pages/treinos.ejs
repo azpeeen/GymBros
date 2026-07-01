@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/css/footer.css">
 <link rel="stylesheet" href="/css/area-aluno.css">
 <link rel="stylesheet" href="/css/treinos.css">
+<link rel="stylesheet" href="/css/compartilhar-feed.css">
 </head>
 <body>
 
@@ -367,6 +368,7 @@
 <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 <script>window.GYMBROS_USER_ID = '<%= user.cpf %>';</script>
+<script src="/js/compartilhar-feed.js"></script>
 <script>
 // ─── Check-in ────────────────────────────────────────────
 (async function initCheckin() {
@@ -416,6 +418,23 @@
                 const data = await r.json();
                 const s    = await fetch('/treinos/checkin/status').then(x => x.json());
                 renderCheckedIn(data.ok ? data.created_at : null, s.streak || 0);
+
+                if (data.ok && window.abrirModalCompartilhar) {
+                    if (data.novasConquistas?.length) {
+                        const top = data.novasConquistas[0];
+                        await window.abrirModalCompartilhar({
+                            tipo: 'conquista',
+                            ref_tipo: 'conquista',
+                            payload: { conquista_nome: top.nome, conquista_icone: top.icone },
+                        });
+                    }
+                    await window.abrirModalCompartilhar({
+                        tipo: 'checkin',
+                        ref_id: data.checkinId,
+                        ref_tipo: 'checkin',
+                        payload: { gym_nome: 'Academia' },
+                    });
+                }
             } catch {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fas fa-check"></i> ${(window.__t || (k=>k))('treinos.checkin.btn')}`;
