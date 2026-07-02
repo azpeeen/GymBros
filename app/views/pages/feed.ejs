@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/css/header.css">
 <link rel="stylesheet" href="/css/footer.css">
 <link rel="stylesheet" href="/css/area-aluno.css">
+<link rel="stylesheet" href="/css/compartilhar-feed.css">
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -83,6 +84,24 @@
 
                 <section class="feed-header">
                     <h1>Feed</h1>
+                </section>
+
+                <!-- Stories strip -->
+                <section class="stories-strip" id="stories-strip">
+                    <section class="story-bubble story-bubble--proprio" id="story-proprio">
+                        <section class="story-avatar-wrap">
+                            <img src="<%= user.profile_photo || '/images/avatar.png' %>"
+                                class="story-avatar" alt="Seu story">
+                            <section class="story-add-btn">+</section>
+                        </section>
+                        <span class="story-nome">Seu story</span>
+                    </section>
+
+                    <section id="stories-amigos">
+                        <section class="story-bubble story-skeleton"></section>
+                        <section class="story-bubble story-skeleton"></section>
+                        <section class="story-bubble story-skeleton"></section>
+                    </section>
                 </section>
 
                 <section id="feed-novos-banner" class="feed-novos-banner" style="display:none"></section>
@@ -198,6 +217,126 @@
     <img id="lightbox-img" class="lightbox-img" src="" alt="">
 </section>
 
+<!-- Story Viewer -->
+<section id="story-viewer">
+    <section class="story-viewer-header">
+        <section class="story-progress-bars" id="story-progress-bars"></section>
+        <section class="story-viewer-autor">
+            <img id="story-viewer-foto" src="" class="story-viewer-avatar" alt="">
+            <section>
+                <span id="story-viewer-nome" class="story-viewer-nome"></span>
+                <span id="story-viewer-tempo" class="story-viewer-tempo"></span>
+            </section>
+            <button id="story-viewer-fechar" class="story-viewer-fechar" type="button">
+                <i class="fas fa-times"></i>
+            </button>
+        </section>
+    </section>
+
+    <section class="story-viewer-content" id="story-viewer-content"></section>
+
+    <section class="story-nav-left"  id="story-nav-left"></section>
+    <section class="story-nav-right" id="story-nav-right"></section>
+
+    <!-- Rodapé owner (só aparece no próprio story) -->
+    <section class="story-viewer-footer" id="story-viewer-footer" style="display:none">
+        <section class="story-viewer-views">
+            <i class="fas fa-eye"></i>
+            <span id="story-viewer-views-count">0</span>
+        </section>
+        <button class="story-viewer-menu-btn" type="button" id="story-viewer-menu-btn">
+            <i class="fas fa-ellipsis-h"></i>
+        </button>
+        <section class="story-viewer-menu" id="story-viewer-menu" style="display:none">
+            <button type="button" class="story-viewer-menu-item" id="story-btn-ver-views">
+                <i class="fas fa-eye"></i> Ver quem visualizou
+            </button>
+            <button type="button" class="story-viewer-menu-item story-viewer-menu-item--danger" id="story-btn-apagar">
+                <i class="fas fa-trash"></i> Apagar story
+            </button>
+        </section>
+    </section>
+</section>
+
+<!-- Modal de visualizações do story -->
+<section class="story-views-modal" id="story-views-modal" style="display:none">
+    <section class="story-views-box">
+        <section class="story-views-header">
+            <h3 class="story-views-title">Visualizações</h3>
+            <button type="button" class="story-views-fechar" id="story-views-fechar">
+                <i class="fas fa-times"></i>
+            </button>
+        </section>
+        <section class="story-views-lista" id="story-views-lista">
+            <section class="story-views-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+            </section>
+        </section>
+    </section>
+</section>
+
+<!-- Modal de exclusão do story -->
+<section class="story-delete-modal" id="story-delete-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="story-delete-title">
+    <section class="story-delete-box">
+        <section class="story-delete-icon">
+            <i class="fas fa-trash"></i>
+        </section>
+        <h3 class="story-delete-title" id="story-delete-title">Excluir story?</h3>
+        <p class="story-delete-desc">Essa ação remove o story para todos os seguidores e não pode ser desfeita.</p>
+        <section class="story-delete-actions">
+            <button type="button" class="story-delete-btn story-delete-btn-cancel" id="story-delete-cancel">Cancelar</button>
+            <button type="button" class="story-delete-btn story-delete-btn-danger" id="story-delete-confirm">Excluir</button>
+        </section>
+    </section>
+</section>
+
+<!-- Modal criar story -->
+<section id="modal-criar-story" class="story-criar-modal" style="display:none">
+    <section class="story-criar-box">
+        <section class="story-criar-header">
+            <h3>Criar story</h3>
+            <button id="btn-fechar-criar-story" class="story-criar-fechar" type="button">
+                <i class="fas fa-times"></i>
+            </button>
+        </section>
+        <p class="story-criar-sub">Seu story some após 24 horas</p>
+
+        <section class="story-criar-opcoes">
+            <button class="story-criar-opcao" type="button" id="story-opcao-foto">
+                <i class="fas fa-image"></i>
+                <span>Foto</span>
+            </button>
+            <button class="story-criar-opcao" type="button" id="story-opcao-video">
+                <i class="fas fa-video"></i>
+                <span>Vídeo</span>
+            </button>
+            <button class="story-criar-opcao" type="button" id="story-opcao-texto">
+                <i class="fas fa-font"></i>
+                <span>Texto</span>
+            </button>
+        </section>
+
+        <input type="file" id="story-file-input" accept="image/*,video/*" hidden>
+
+        <section id="story-texto-editor" style="display:none">
+            <textarea id="story-texto-input"
+                class="story-texto-input"
+                placeholder="O que você quer compartilhar?"
+                maxlength="500"></textarea>
+            <section class="story-cor-picker">
+                <span class="story-cor-label">Cor de fundo:</span>
+                <% ['#1a1a1a', '#C98B1D', '#1e3a5f', '#2d1b69', '#1a3a1a'].forEach(function(bg, i) { %>
+                <button type="button" class="story-cor-btn<%= i === 0 ? ' selecionada' : '' %>"
+                    data-bg="<%= bg %>" style="background:<%= bg %>"></button>
+                <% }); %>
+            </section>
+            <button type="button" id="btn-postar-story-texto" class="story-criar-publicar">
+                Publicar Story
+            </button>
+        </section>
+    </section>
+</section>
+
 <script>
 window.__FEED_STATE__ = {
     hasMore:          <%- JSON.stringify(hasMore) %>,
@@ -206,6 +345,7 @@ window.__FEED_STATE__ = {
     primeiroPostId:   <%- JSON.stringify((items.find(i => i._tipo === 'post')   || {}).id || null) %>,
     primeiroEventId:  <%- JSON.stringify((items.find(i => i._tipo === 'evento') || {}).id || null) %>,
     minhaFoto:        <%- JSON.stringify(user.profile_photo || '/images/avatar.png') %>,
+    meuUserId:        <%- JSON.stringify(user.id) %>,
 };
 </script>
 
@@ -1132,6 +1272,523 @@ carregarSugestoesMobile();
         if (!input) return;
         setTimeout(() => fecharDropdownMencao(input), 150);
     }, true);
+
+    // ── Stories (F8) ─────────────────────────────────────────────────────────
+    let storiesData     = [];
+    let storyGrupoAtual = -1;
+    let storyIndexAtual = 0;
+    let storyTimer       = null;
+    const STORY_DURACAO  = 5000;
+
+    let storyPausado        = false;
+    let storyTempoRestante  = STORY_DURACAO;
+    let storyInicioAtual    = null;
+    let storyModalAberto    = false;
+
+    const storiesAmigosEl = document.getElementById('stories-amigos');
+    const storyViewerEl   = document.getElementById('story-viewer');
+    const storyProprioEl  = document.getElementById('story-proprio');
+
+    async function carregarStories() {
+        if (!storiesAmigosEl) return;
+        try {
+            const data = await fetch('/api/stories/feed').then(r => r.json());
+            const gruposAmigos = data.grupos || [];
+            const proprio       = data.proprio || null;
+            const offset        = proprio ? 1 : 0;
+
+            storiesData = proprio ? [proprio, ...gruposAmigos] : gruposAmigos;
+
+            if (storyProprioEl) {
+                storyProprioEl.classList.toggle('story-bubble--novo', !!proprio);
+                storyProprioEl.dataset.grupo = proprio ? '0' : '';
+            }
+
+            if (!gruposAmigos.length) {
+                storiesAmigosEl.innerHTML = '';
+                return;
+            }
+
+            storiesAmigosEl.innerHTML = gruposAmigos.map((grupo, idx) => {
+                const status = grupo.total_vistos >= grupo.total_stories ? 'visto' : 'novo';
+                const nome   = escapeHtml((grupo.user_nome || '').split(' ')[0]);
+                const foto   = escapeHtml(grupo.user_foto || '/images/avatar.png');
+                return `
+                <section class="story-bubble story-bubble--${status}" data-grupo="${idx + offset}">
+                    <section class="story-avatar-wrap">
+                        <img src="${foto}" class="story-avatar" alt="${nome}">
+                    </section>
+                    <span class="story-nome">${nome}</span>
+                </section>`;
+            }).join('');
+        } catch (_) {
+            storiesAmigosEl.innerHTML = '';
+        }
+    }
+
+    function abrirStoryViewer(grupoIdx) {
+        storyGrupoAtual = grupoIdx;
+        storyIndexAtual = 0;
+        mostrarStoryAtual();
+        storyViewerEl?.classList.add('aberto');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function fecharStoryViewer() {
+        clearTimeout(storyTimer);
+        storyViewerEl?.classList.remove('aberto');
+        document.body.style.overflow = '';
+        storyGrupoAtual = -1;
+        storyIndexAtual = 0;
+    }
+
+    function pausarStory() {
+        if (storyGrupoAtual < 0 || storyPausado) return;
+        storyPausado = true;
+        clearTimeout(storyTimer);
+
+        if (storyInicioAtual) {
+            const decorrido = Date.now() - storyInicioAtual;
+            storyTempoRestante = Math.max(0, storyTempoRestante - decorrido);
+        }
+
+        const fill = document.getElementById(`progress-${storyIndexAtual}`);
+        if (fill) {
+            const computed    = window.getComputedStyle(fill).width;
+            const parentWidth = fill.parentElement?.clientWidth || 1;
+            const pct = (parseFloat(computed) / parentWidth) * 100;
+            fill.style.transition = 'none';
+            fill.style.width = pct + '%';
+        }
+    }
+
+    function retomarStory() {
+        if (storyGrupoAtual < 0 || !storyPausado) return;
+        storyPausado = false;
+        storyInicioAtual = Date.now();
+
+        const fill = document.getElementById(`progress-${storyIndexAtual}`);
+        if (fill) {
+            requestAnimationFrame(() => {
+                fill.style.transition = `width ${storyTempoRestante}ms linear`;
+                fill.style.width = '100%';
+            });
+        }
+
+        clearTimeout(storyTimer);
+        storyTimer = setTimeout(() => {
+            storyIndexAtual++;
+            mostrarStoryAtual();
+        }, storyTempoRestante);
+    }
+
+    function mostrarStoryAtual() {
+        const grupo = storiesData[storyGrupoAtual];
+        if (!grupo) { fecharStoryViewer(); return; }
+
+        const story = grupo.stories[storyIndexAtual];
+        if (!story) {
+            if (storyGrupoAtual < storiesData.length - 1) {
+                storyGrupoAtual++;
+                storyIndexAtual = 0;
+                mostrarStoryAtual();
+            } else {
+                fecharStoryViewer();
+            }
+            return;
+        }
+
+        document.getElementById('story-viewer-foto').src = grupo.user_foto || '/images/avatar.png';
+        document.getElementById('story-viewer-nome').textContent = grupo.user_nome;
+        document.getElementById('story-viewer-tempo').textContent = formatarTempoPost(story.created_at);
+
+        const barras = document.getElementById('story-progress-bars');
+        barras.innerHTML = grupo.stories.map((_, i) => `
+            <section class="story-progress-bar">
+                <section class="story-progress-fill ${i < storyIndexAtual ? 'completo' : ''}" id="progress-${i}"></section>
+            </section>
+        `).join('');
+
+        const content = document.getElementById('story-viewer-content');
+        if (story.tipo === 'foto') {
+            content.innerHTML = `<img src="${escapeHtml(story.url)}" alt="Story">`;
+        } else if (story.tipo === 'video') {
+            content.innerHTML = `
+                <video
+                    src="${escapeHtml(story.url)}"
+                    autoplay
+                    muted
+                    playsinline
+                    preload="auto"
+                    webkit-playsinline
+                    x5-playsinline
+                    onloadeddata="this.play().catch(()=>{})"
+                    onerror="this.style.display='none'; this.parentElement.innerHTML += '<section class=\"story-texto-card\">Não foi possível reproduzir este vídeo.</section>'"
+                ></video>`;
+        } else {
+            content.innerHTML = `
+                <section class="story-texto-card" style="background:${escapeHtml(story.cor_fundo || '#1a1a1a')}">
+                    ${escapeHtml(story.texto || '')}
+                </section>`;
+        }
+
+        const isOwner = grupo.user_id === window.__FEED_STATE__.meuUserId;
+        if (!isOwner) {
+            fetch(`/api/stories/${story.id}/view`, { method: 'POST' }).catch(() => {});
+        }
+
+        const storyFooterEl = document.getElementById('story-viewer-footer');
+        if (storyFooterEl) {
+            storyFooterEl.style.display = isOwner ? 'flex' : 'none';
+            storyFooterEl.dataset.storyId = story.id;
+            const viewsCount = document.getElementById('story-viewer-views-count');
+            if (viewsCount) viewsCount.textContent = story.views || 0;
+            const menuEl = document.getElementById('story-viewer-menu');
+            if (menuEl) menuEl.style.display = 'none';
+        }
+
+        clearTimeout(storyTimer);
+        storyPausado       = false;
+        storyTempoRestante = STORY_DURACAO;
+
+        const fill = document.getElementById(`progress-${storyIndexAtual}`);
+        if (fill) {
+            requestAnimationFrame(() => {
+                fill.style.transition = `width ${STORY_DURACAO}ms linear`;
+                fill.style.width = '100%';
+            });
+        }
+        storyInicioAtual = Date.now();
+        storyTimer = setTimeout(() => {
+            storyIndexAtual++;
+            mostrarStoryAtual();
+        }, STORY_DURACAO);
+    }
+
+    function storyAnterior() {
+        clearTimeout(storyTimer);
+        if (storyIndexAtual > 0) {
+            storyIndexAtual--;
+        } else if (storyGrupoAtual > 0) {
+            storyGrupoAtual--;
+            storyIndexAtual = storiesData[storyGrupoAtual].stories.length - 1;
+        }
+        mostrarStoryAtual();
+    }
+
+    function storyProximo() {
+        clearTimeout(storyTimer);
+        storyIndexAtual++;
+        mostrarStoryAtual();
+    }
+
+    document.getElementById('story-viewer-fechar')?.addEventListener('click', fecharStoryViewer);
+
+    // Clique (desktop) nas zonas de navegação — suprimido quando o toque
+    // (mobile) já navegou, pra não disparar duas vezes pro mesmo gesto.
+    let ignorarProximoClique = false;
+    document.getElementById('story-nav-left')?.addEventListener('click', () => {
+        if (ignorarProximoClique) { ignorarProximoClique = false; return; }
+        storyAnterior();
+    });
+    document.getElementById('story-nav-right')?.addEventListener('click', () => {
+        if (ignorarProximoClique) { ignorarProximoClique = false; return; }
+        storyProximo();
+    });
+
+    document.addEventListener('keydown', e => {
+        if (storyGrupoAtual < 0) return;
+        if (e.key === 'Escape')    fecharStoryViewer();
+        if (e.key === 'ArrowRight') storyProximo();
+        if (e.key === 'ArrowLeft')  storyAnterior();
+    });
+
+    // ── Segurar para pausar / toque para navegar ────────────────────────────
+    const storyAreaExcluida = el => el.closest('.story-viewer-header') || el.closest('.story-viewer-footer');
+
+    storyViewerEl?.addEventListener('mousedown', e => {
+        if (storyAreaExcluida(e.target)) return;
+        pausarStory();
+    });
+    storyViewerEl?.addEventListener('mouseup', () => {
+        if (storyModalAberto) return;
+        retomarStory();
+    });
+    storyViewerEl?.addEventListener('mouseleave', () => {
+        if (storyModalAberto || !storyPausado) return;
+        retomarStory();
+    });
+
+    let touchStartTime = 0;
+    let touchStartX    = 0;
+    let touchHoldTimer = null;
+    const TOQUE_LIMITE_MS = 200;
+
+    storyViewerEl?.addEventListener('touchstart', e => {
+        if (storyAreaExcluida(e.target)) return;
+        touchStartTime = Date.now();
+        touchStartX    = e.touches[0].clientX;
+        clearTimeout(touchHoldTimer);
+        touchHoldTimer = setTimeout(pausarStory, TOQUE_LIMITE_MS);
+    }, { passive: true });
+
+    storyViewerEl?.addEventListener('touchend', e => {
+        if (storyAreaExcluida(e.target) || storyModalAberto) return;
+        clearTimeout(touchHoldTimer);
+
+        const duracao = Date.now() - touchStartTime;
+        const deltaX  = e.changedTouches[0].clientX - touchStartX;
+
+        if (storyPausado) {
+            retomarStory();
+            return;
+        }
+
+        if (duracao < TOQUE_LIMITE_MS && Math.abs(deltaX) < 10) {
+            ignorarProximoClique = true;
+            const largura = storyViewerEl.clientWidth;
+            if (e.changedTouches[0].clientX < largura * 0.35) {
+                storyAnterior();
+            } else {
+                storyProximo();
+            }
+        }
+    }, { passive: true });
+
+    storiesAmigosEl?.addEventListener('click', e => {
+        const bubble = e.target.closest('.story-bubble[data-grupo]');
+        if (!bubble) return;
+        abrirStoryViewer(parseInt(bubble.dataset.grupo, 10));
+    });
+
+    // ── Story owner actions (menu, ver quem viu, apagar) ───────────────────────
+    const storyFooter     = document.getElementById('story-viewer-footer');
+    const storyMenuBtn    = document.getElementById('story-viewer-menu-btn');
+    const storyMenu       = document.getElementById('story-viewer-menu');
+    const storyViewsModal = document.getElementById('story-views-modal');
+    const storyViewsLista = document.getElementById('story-views-lista');
+    const storyDeleteModal = document.getElementById('story-delete-modal');
+    const storyDeleteCancelBtn = document.getElementById('story-delete-cancel');
+    const storyDeleteConfirmBtn = document.getElementById('story-delete-confirm');
+    let storyIdParaExcluir = null;
+
+    storyMenuBtn?.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!storyMenu) return;
+        storyMenu.style.display = storyMenu.style.display === 'block' ? 'none' : 'block';
+    });
+
+    document.addEventListener('click', e => {
+        if (storyMenu && storyMenu.style.display === 'block' && !storyMenuBtn?.contains(e.target)) {
+            storyMenu.style.display = 'none';
+        }
+    });
+
+    document.getElementById('story-btn-ver-views')?.addEventListener('click', async () => {
+        if (storyMenu) storyMenu.style.display = 'none';
+        const storyId = storyFooter?.dataset.storyId;
+        if (!storyId || !storyViewsModal || !storyViewsLista) return;
+
+        storyModalAberto = true;
+        pausarStory();
+
+        storyViewsModal.style.display = 'flex';
+        storyViewsLista.innerHTML = '<section class="story-views-loading"><i class="fas fa-spinner fa-spin"></i></section>';
+
+        try {
+            const data = await fetch(`/api/stories/${storyId}/views`).then(r => r.json());
+
+            if (!data.ok || !data.visualizacoes?.length) {
+                storyViewsLista.innerHTML = '<section class="story-views-loading">Nenhuma visualização ainda</section>';
+                return;
+            }
+
+            storyViewsLista.innerHTML = data.visualizacoes.map(v => `
+                <a href="/u/${encodeURIComponent(v.username || v.id)}" class="story-view-item">
+                    <img src="${escapeHtml(v.foto_perfil || '/images/avatar.png')}" class="story-view-avatar" alt="${escapeHtml(v.nome)}">
+                    <section>
+                        <section class="story-view-nome">${escapeHtml(v.nome)}</section>
+                        ${v.username ? `<section class="story-view-username">@${escapeHtml(v.username)}</section>` : ''}
+                    </section>
+                    <span class="story-view-tempo">${formatarTempoPost(v.viewed_at)}</span>
+                </a>
+            `).join('');
+        } catch (_) {
+            storyViewsLista.innerHTML = '<section class="story-views-loading">Erro ao carregar</section>';
+        }
+    });
+
+    document.getElementById('story-views-fechar')?.addEventListener('click', () => {
+        storyModalAberto = false;
+        if (storyViewsModal) storyViewsModal.style.display = 'none';
+        retomarStory();
+    });
+
+    function abrirModalExcluirStory(storyId) {
+        if (!storyDeleteModal) return;
+        storyIdParaExcluir = storyId;
+        storyModalAberto = true;
+        storyDeleteModal.style.display = 'flex';
+        pausarStory();
+    }
+
+    function fecharModalExcluirStory() {
+        storyIdParaExcluir = null;
+        storyModalAberto = false;
+        if (storyDeleteModal) storyDeleteModal.style.display = 'none';
+        retomarStory();
+    }
+
+    storyDeleteCancelBtn?.addEventListener('click', fecharModalExcluirStory);
+    storyDeleteModal?.addEventListener('click', e => {
+        if (e.target === storyDeleteModal) fecharModalExcluirStory();
+    });
+    storyDeleteConfirmBtn?.addEventListener('click', async () => {
+        const storyId = storyIdParaExcluir;
+        if (!storyId) return;
+        fecharModalExcluirStory();
+
+        try {
+            const data = await fetch(`/api/stories/${storyId}`, { method: 'DELETE' }).then(r => r.json());
+            if (data.ok) {
+                fecharStoryViewer();
+                await carregarStories();
+            } else {
+                mostrarMensagem(data.erro || 'Erro ao apagar story.', 'erro');
+            }
+        } catch (_) {
+            mostrarMensagem('Erro ao apagar story.', 'erro');
+        }
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && storyDeleteModal && storyDeleteModal.style.display === 'flex') {
+            fecharModalExcluirStory();
+        }
+    });
+
+    document.addEventListener('click', e => {
+        const apagarBtn = e.target.closest('#story-btn-apagar');
+        if (!apagarBtn) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        if (storyMenu) storyMenu.style.display = 'none';
+
+        const storyId = storyFooter?.dataset.storyId;
+        if (!storyId) return;
+        abrirModalExcluirStory(storyId);
+    });
+
+    // ── Modal criar story ────────────────────────────────────────────────────
+    const modalCriarStory  = document.getElementById('modal-criar-story');
+    const storyTextoEditor = document.getElementById('story-texto-editor');
+    const storyFileInput   = document.getElementById('story-file-input');
+    let storyCor = '#1a1a1a';
+
+    function abrirModalCriarStory() {
+        if (modalCriarStory) modalCriarStory.style.display = 'flex';
+    }
+
+    function fecharModalCriarStory() {
+        if (modalCriarStory) modalCriarStory.style.display = 'none';
+        if (storyTextoEditor) storyTextoEditor.style.display = 'none';
+        const textoInput = document.getElementById('story-texto-input');
+        if (textoInput) textoInput.value = '';
+    }
+
+    storyProprioEl?.addEventListener('click', e => {
+        const addBtn  = e.target.closest('.story-add-btn');
+        const temStory = storyProprioEl.dataset.grupo !== '';
+        if (addBtn || !temStory) {
+            abrirModalCriarStory();
+            return;
+        }
+        abrirStoryViewer(parseInt(storyProprioEl.dataset.grupo, 10));
+    });
+    document.getElementById('btn-fechar-criar-story')?.addEventListener('click', fecharModalCriarStory);
+
+    document.getElementById('story-opcao-foto')?.addEventListener('click', () => {
+        if (storyFileInput) { storyFileInput.accept = 'image/*'; storyFileInput.click(); }
+    });
+    document.getElementById('story-opcao-video')?.addEventListener('click', () => {
+        if (storyFileInput) { storyFileInput.accept = 'video/*'; storyFileInput.click(); }
+    });
+    document.getElementById('story-opcao-texto')?.addEventListener('click', () => {
+        if (storyTextoEditor) storyTextoEditor.style.display = 'block';
+    });
+
+    storyFileInput?.addEventListener('change', async e => {
+        console.log('[story] change disparado');
+        const btnFoto  = document.getElementById('story-opcao-foto');
+        const btnVideo = document.getElementById('story-opcao-video');
+
+        try {
+            const file = e.target.files[0];
+            if (!file) { console.log('[story] sem arquivo'); return; }
+            console.log('[story] arquivo:', file.name, file.type, file.size);
+
+            if (btnFoto)  { btnFoto.disabled  = true; btnFoto.innerHTML  = '<i class="fas fa-spinner fa-spin"></i><span>Enviando...</span>'; }
+            if (btnVideo) { btnVideo.disabled = true; btnVideo.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Enviando...</span>'; }
+
+            const form = new FormData();
+            form.append('midia', file);
+            form.append('tipo', file.type.startsWith('video') ? 'video' : 'foto');
+            console.log('[story] FormData montado, enviando fetch...');
+
+            const res = await fetch('/api/stories', { method: 'POST', body: form });
+            console.log('[story] status HTTP:', res.status);
+            const data = await res.json();
+            console.log('[story] resposta:', data);
+
+            if (data.ok) {
+                fecharModalCriarStory();
+                await carregarStories();
+                console.log('[story] strip atualizada');
+            } else {
+                mostrarMensagem(data.erro || 'Erro ao publicar story.', 'erro');
+            }
+        } catch (err) {
+            console.error('[story] erro no handler de upload:', err);
+            mostrarMensagem('Erro ao publicar story.', 'erro');
+        } finally {
+            if (btnFoto)  { btnFoto.disabled  = false; btnFoto.innerHTML  = '<i class="fas fa-image"></i><span>Foto</span>'; }
+            if (btnVideo) { btnVideo.disabled = false; btnVideo.innerHTML = '<i class="fas fa-video"></i><span>Vídeo</span>'; }
+            e.target.value = '';
+        }
+    });
+
+    document.querySelectorAll('.story-cor-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            storyCor = btn.dataset.bg;
+            document.querySelectorAll('.story-cor-btn').forEach(b => b.classList.remove('selecionada'));
+            btn.classList.add('selecionada');
+        });
+    });
+
+    document.getElementById('btn-postar-story-texto')?.addEventListener('click', async () => {
+        const textoInput = document.getElementById('story-texto-input');
+        const texto = textoInput?.value.trim();
+        if (!texto) return;
+
+        try {
+            const data = await fetch('/api/stories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tipo: 'texto', texto, cor_fundo: storyCor }),
+            }).then(r => r.json());
+            if (data.ok) {
+                fecharModalCriarStory();
+                await carregarStories();
+            } else {
+                mostrarMensagem(data.erro || 'Erro ao publicar story.', 'erro');
+            }
+        } catch (_) {
+            mostrarMensagem('Erro ao publicar story.', 'erro');
+        }
+    });
+
+    carregarStories();
 })();
 </script>
 
